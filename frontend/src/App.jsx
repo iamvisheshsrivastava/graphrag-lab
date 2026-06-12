@@ -5,6 +5,7 @@ import GraphViewer from './components/GraphViewer'
 import QueryPanel from './components/QueryPanel'
 import VerificationPanel from './components/VerificationPanel'
 import TraceabilityPanel from './components/TraceabilityPanel'
+import CypherConsole from './components/CypherConsole'
 
 const PAGE_TITLES = {
   requirements: 'Requirements Manager',
@@ -12,6 +13,7 @@ const PAGE_TITLES = {
   query:        'GraphRAG Query Interface',
   verify:       'Requirements Verification',
   traceability: 'Traceability Matrix',
+  cypher:       'Cypher Console',
 }
 
 const PAGE_SUBTITLES = {
@@ -20,6 +22,7 @@ const PAGE_SUBTITLES = {
   query:        'Natural language queries answered by graph-guided retrieval + LLM generation',
   verify:       'Deterministic rule-based verification against ISO 26262 and SAE J3016',
   traceability: 'Upstream/downstream dependency tracing for certification evidence',
+  cypher:       'Direct Cypher queries against the Neo4j AuraDB knowledge graph',
 }
 
 export default function App() {
@@ -63,6 +66,9 @@ export default function App() {
           )}
           {page === 'traceability' && (
             <TraceabilityPanel graph={graph} requirements={requirements} />
+          )}
+          {page === 'cypher' && (
+            <CypherConsole />
           )}
         </div>
       </main>

@@ -33,4 +33,10 @@ export const verifyAll = () =>
 export const verifyOne = (reqId) =>
   api.post(`/requirements/verify/${reqId}`).then(r => r.data)
 
+export const runCypher = (query, params = {}) =>
+  api.post('/query/cypher', { query, params }).then(r => r.data)
+
+export const getNeo4jStatus = () =>
+  api.get('/graph/neo4j/status').then(r => r.data)
+
 export default api

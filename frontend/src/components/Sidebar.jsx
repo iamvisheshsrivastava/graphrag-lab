@@ -1,12 +1,13 @@
-import { GitBranch, Search, CheckSquare, List, Activity, ChevronRight } from 'lucide-react'
+import { GitBranch, Search, CheckSquare, List, Activity, ChevronRight, Database } from 'lucide-react'
 import clsx from 'clsx'
 
 const NAV = [
-  { id: 'requirements', label: 'Requirements', icon: List },
+  { id: 'requirements', label: 'Requirements',   icon: List },
   { id: 'graph',        label: 'Knowledge Graph', icon: GitBranch },
-  { id: 'query',        label: 'GraphRAG Query', icon: Search },
-  { id: 'verify',       label: 'Verification', icon: CheckSquare },
-  { id: 'traceability', label: 'Traceability', icon: Activity },
+  { id: 'query',        label: 'GraphRAG Query',  icon: Search },
+  { id: 'verify',       label: 'Verification',    icon: CheckSquare },
+  { id: 'traceability', label: 'Traceability',    icon: Activity },
+  { id: 'cypher',       label: 'Cypher Console',  icon: Database },
 ]
 
 export default function Sidebar({ active, onNav }) {
