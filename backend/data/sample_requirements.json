@@ -1,0 +1,92 @@
+[
+  {
+    "id": "REQ-001",
+    "text": "The Automatic Parking Assist (APA) system shall detect available parking spaces using ultrasonic sensors with a minimum detection range of 4.5 meters.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["detection", "ultrasonic", "APA"],
+    "source": "SYS_SPEC_v1.2"
+  },
+  {
+    "id": "REQ-002",
+    "text": "The driver shall continuously monitor the vehicle environment and be prepared to take over control immediately during APA operation. The system shall issue a visual and auditory warning if driver attention is lost.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["driver monitoring", "takeover", "safety"],
+    "source": "SYS_SPEC_v1.2"
+  },
+  {
+    "id": "REQ-003",
+    "text": "The parking trajectory computation shall complete within 200 milliseconds of slot detection to comply with real-time control loop requirements. REQ-001 must be satisfied before this function activates.",
+    "type": "performance",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["latency", "trajectory", "real-time"],
+    "source": "SYS_SPEC_v1.2"
+  },
+  {
+    "id": "REQ-004",
+    "text": "The Remote Parking Assist (RPA) function shall conform to ISO 26262 ASIL-B requirements for all safety-relevant software components, including the collision avoidance module.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["ASIL-B", "ISO26262", "collision avoidance"],
+    "source": "SAFETY_PLAN_v2.0"
+  },
+  {
+    "id": "REQ-005",
+    "text": "The 360-degree camera system (Camera360) shall provide surround-view coverage with a minimum resolution of 1280x720 pixels at 30 fps for obstacle detection during parking maneuvers.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["camera", "surround view", "resolution"],
+    "source": "HW_SPEC_v1.0"
+  },
+  {
+    "id": "REQ-006",
+    "text": "The Summon function shall only operate when the vehicle speed is below 10 km/h. The system shall automatically disengage and apply the brakes if this threshold is exceeded.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["speed limit", "summon", "disengage"],
+    "source": "SYS_SPEC_v1.2"
+  },
+  {
+    "id": "REQ-007",
+    "text": "The parking ECU shall implement redundant sensor fusion combining ultrasonic sensor and Camera360 data to achieve a pedestrian detection false-negative rate below 0.1% per operational hour.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["sensor fusion", "redundancy", "pedestrian detection"],
+    "source": "SAFETY_PLAN_v2.0"
+  },
+  {
+    "id": "REQ-008",
+    "text": "The APA interface shall provide the driver with real-time visual feedback of the detected parking space boundary overlay on the Camera360 surround-view image. REQ-005 shall be satisfied first.",
+    "type": "interface",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["HMI", "visualization", "overlay"],
+    "source": "HMI_SPEC_v1.1"
+  },
+  {
+    "id": "REQ-009",
+    "text": "All parking functions shall maintain a maximum lateral positioning error of ±5 cm relative to the target parking slot centerline, measured under nominal environmental conditions.",
+    "type": "performance",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["accuracy", "lateral control", "positioning"],
+    "source": "SYS_SPEC_v1.2"
+  },
+  {
+    "id": "REQ-010",
+    "text": "The system shall log all sensor data, ECU states, and driver interactions during parking maneuvers with a timestamp accuracy of ±1 ms for post-hoc analysis and certification evidence.",
+    "type": "non_functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["logging", "traceability", "certification"],
+    "source": "SYS_SPEC_v1.2"
+  }
+]
