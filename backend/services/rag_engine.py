@@ -17,23 +17,40 @@ try:
 except ImportError:
     _openai_available = False
 
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+FREE_MODEL = "google/gemma-4-31b-it:free"
 
-SYSTEM_PROMPT = """You are an expert in automotive requirements engineering for ADAS parking systems.
-You have access to a domain-specific knowledge graph built from parking function requirements.
-Answer questions with precision, referencing requirement IDs and ontology concepts.
-Always cite the specific nodes and edges used in your reasoning (traceable answer).
-Mention if requirements are incomplete, ambiguous, or conflict with ISO 26262 / SAE J3016 standards."""
+
+SYSTEM_PROMPT = """You are an expert in automotive systems engineering and requirements analysis for ADAS functions.
+You have access to a domain-specific knowledge graph built from structured automotive requirements.
+Answer questions precisely, referencing requirement IDs and ontology concepts from the graph context.
+Always cite the specific nodes and edges used in your reasoning so answers are fully traceable.
+Flag any requirements that appear incomplete, ambiguous, or inconsistent with ISO 26262 or SAE J3016 standards."""
 
 
 class RAGEngine:
     def __init__(self):
         self._client: Optional[object] = None
-        self._model = "gpt-4o"
+        self._model = FREE_MODEL
 
     def _get_client(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key and _openai_available and self._client is None:
-            self._client = AsyncOpenAI(api_key=api_key)
+        if not _openai_available:
+            return None
+        # Always re-read env so hot-reload picks up new keys
+        or_key = os.getenv("OPENROUTER_API_KEY")
+        oa_key = os.getenv("OPENAI_API_KEY")
+        if or_key:
+            self._client = AsyncOpenAI(
+                api_key=or_key,
+                base_url=OPENROUTER_BASE_URL,
+                default_headers={"HTTP-Referer": "https://github.com/iamvisheshsrivastava/graphrag-lab"},
+            )
+            self._model = FREE_MODEL
+        elif oa_key:
+            self._client = AsyncOpenAI(api_key=oa_key)
+            self._model = "gpt-4o"
+        else:
+            self._client = None
         return self._client
 
     def _build_context(self, nodes: List[GraphNode], traversal_path: List[str]) -> str:
