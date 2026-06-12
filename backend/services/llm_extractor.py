@@ -19,7 +19,7 @@ import os
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def _get_client():
     return None, None
 
 
-def extract_graph_from_requirements(requirements: list[dict]) -> dict[str, Any]:
+def extract_graph_from_requirements(requirements: List[Dict]) -> Dict[str, Any]:
     """
     Call the LLM to extract entities + relations from a list of requirements.
     Returns { "entities": [...], "relations": [...] } or empty dicts on failure.

@@ -13,7 +13,7 @@ Falls back to keyword-based extraction if LLM is unavailable.
 
 import re
 import networkx as nx
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from models.schemas import (
     Requirement, KnowledgeGraph, GraphNode, GraphEdge,
@@ -162,7 +162,7 @@ class GraphBuilder:
     # ─── Keyword fallback ─────────────────────────────────────────────────────
 
     def _build_from_keywords(self, requirements, nodes, edges):
-        req_entities: dict[str, list] = {}
+        req_entities: Dict[str, list] = {}
         for req in requirements:
             entities = self._extract_entities_kw(req.text)
             req_entities[req.id] = entities
@@ -277,7 +277,7 @@ class GraphBuilder:
 
     def graph_rag_retrieve(self, query: str, top_k: int = 5):
         query_lower = query.lower()
-        scores: dict[str, float] = {}
+        scores: Dict[str, float] = {}
         for node_id, data in self.graph.nodes(data=True):
             score = 0.0
             text_repr = str(data) + " " + node_id

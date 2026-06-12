@@ -20,7 +20,7 @@ Relationships:
 
 import os
 import logging
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ def persist_graph(graph_data: dict) -> bool:
 
 # ─── Cypher Query ─────────────────────────────────────────────────────────────
 
-def run_cypher(query: str, params: dict | None = None) -> dict[str, Any]:
+def run_cypher(query: str, params: Optional[dict] = None) -> dict:
     """
     Execute an arbitrary read-only Cypher query.
     Returns { columns, rows, row_count } or { error }.
