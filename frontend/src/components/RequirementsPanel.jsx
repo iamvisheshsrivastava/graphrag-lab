@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Plus, Upload, Play, Trash2, Tag } from 'lucide-react'
-import { fetchSampleRequirements, addRequirements, buildGraph } from '../lib/api'
+import { useState, useEffect } from 'react'
+import { Plus, Upload, Play, Trash2, Tag, Wifi } from 'lucide-react'
+import { fetchSampleRequirements, addRequirements, buildGraph, wakeBackend } from '../lib/api'
 import clsx from 'clsx'
 
 const TYPE_COLORS = {
@@ -15,14 +15,25 @@ export default function RequirementsPanel({ onGraphBuilt }) {
   const [reqs, setReqs] = useState([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
+  const [backendAwake, setBackendAwake] = useState(false)
+
+  // Silently wake the backend as soon as the panel mounts
+  useEffect(() => {
+    wakeBackend().then(() => setBackendAwake(true))
+  }, [])
 
   async function loadSample() {
     setLoading(true)
-    setStatus('Loading sample requirements…')
+    if (!backendAwake) {
+      setStatus('Waking up backend (first load ~30s)…')
+    } else {
+      setStatus('Loading sample requirements…')
+    }
     try {
       const data = await fetchSampleRequirements()
       setReqs(data)
-      setStatus(`Loaded ${data.length} sample requirements`)
+      setBackendAwake(true)
+      setStatus(`Loaded ${data.length} requirements`)
     } catch {
       setStatus('Backend offline — showing mock data')
       setReqs(MOCK_REQS)
@@ -65,7 +76,12 @@ export default function RequirementsPanel({ onGraphBuilt }) {
             <Trash2 size={12} /> Clear
           </button>
         )}
-        {status && <span className="text-xs text-slate-400 ml-auto">{status}</span>}
+        <span className="ml-auto flex items-center gap-2">
+          {status && <span className="text-xs text-slate-400">{status}</span>}
+          <span className={clsx('flex items-center gap-1 text-[10px]', backendAwake ? 'text-emerald-400' : 'text-slate-500')}>
+            <Wifi size={10} /> {backendAwake ? 'API ready' : 'connecting…'}
+          </span>
+        </span>
       </div>
 
       {/* Stats */}

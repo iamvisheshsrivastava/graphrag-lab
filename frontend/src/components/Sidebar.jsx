@@ -48,8 +48,8 @@ export default function Sidebar({ active, onNav }) {
       {/* Footer */}
       <div className="px-4 py-3 border-t border-slate-700/50">
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          VW PhD Research · GraphRAG<br />
-          SAE L2 Parking Functions
+          GraphRAG · ADAS Requirements<br />
+          ISO 26262 · SAE J3016
         </p>
       </div>
     </aside>

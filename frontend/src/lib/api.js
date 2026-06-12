@@ -1,6 +1,13 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 45000,   // Render free tier can take ~30s to wake up
+})
+
+// Wake the backend — call health endpoint silently on startup
+export const wakeBackend = () =>
+  api.get('/health').catch(() => {})
 
 export const fetchSampleRequirements = () =>
   api.get('/requirements/sample').then(r => r.data)
