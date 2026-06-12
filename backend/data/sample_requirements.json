@@ -1,272 +1,146 @@
 [
   {
-    "id": "REQ-001",
-    "text": "The Automatic Parking Assist (APA) system shall detect available parking spaces using ultrasonic sensors with a minimum detection range of 4.5 meters and a lateral resolution of ±10 cm.",
+    "id": "SYS-001",
+    "text": "The parking assistance system shall support three operational modes: Automatic Parking Assist (APA), Remote Parking Assist (RPA), and Summon function. Mode selection shall be performed exclusively by the driver via the HMI. All modes operate under SAE Level 2 automation.",
     "type": "functional",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["detection", "ultrasonic", "APA", "slot-detection"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["APA", "RPA", "Summon", "HMI", "mode-selection"]
   },
   {
-    "id": "REQ-002",
-    "text": "The driver shall continuously monitor the vehicle environment and be prepared to take over control immediately during APA operation. The system shall issue a visual and auditory warning within 500ms if driver attention is lost.",
+    "id": "SYS-002",
+    "text": "The system architecture shall comply with ISO 26262 for functional safety and ISO 21448 (SOTIF) for safety of the intended functionality. A hazard analysis and risk assessment (HARA) shall be conducted for each parking mode defined in SYS-001.",
     "type": "safety",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["driver monitoring", "takeover", "HMI", "warning"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["ISO26262", "SOTIF", "HARA", "functional-safety"]
   },
   {
-    "id": "REQ-003",
-    "text": "The parking trajectory computation shall complete within 200 milliseconds of slot detection to comply with real-time control loop requirements. REQ-001 must be satisfied before this function activates.",
-    "type": "performance",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["latency", "trajectory", "real-time", "computation"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-004",
-    "text": "The Remote Parking Assist (RPA) function shall conform to ISO 26262 ASIL-B requirements for all safety-relevant software components, including the collision avoidance and trajectory planning modules.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["ASIL-B", "ISO26262", "collision avoidance", "RPA"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-005",
-    "text": "The 360-degree camera system (Camera360) shall provide surround-view coverage with a minimum resolution of 1280x720 pixels at 30 fps and a horizontal field-of-view of at least 190 degrees per camera unit.",
+    "id": "APA-001",
+    "text": "The Automatic Parking Assist function shall detect and classify parking spaces (parallel, perpendicular, and angled slots) using a fusion of ultrasonic sensors and the 360-degree surround-view camera system. Minimum detectable slot width shall be 2.2 m for perpendicular and 5.5 m for parallel parking.",
     "type": "functional",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["camera", "surround view", "resolution", "field-of-view"],
-    "source": "HW_SPEC_v1.0"
+    "tags": ["APA", "slot-detection", "sensor-fusion", "ultrasonic", "camera"]
   },
   {
-    "id": "REQ-006",
-    "text": "The Summon function shall only operate when the vehicle speed is below 10 km/h. The system shall automatically disengage and apply emergency braking if this threshold is exceeded by more than 2 km/h.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["speed limit", "summon", "disengage", "emergency brake"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-007",
-    "text": "The parking ECU shall implement redundant sensor fusion combining ultrasonic sensor and Camera360 data to achieve a pedestrian detection false-negative rate below 0.1% per operational hour.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["sensor fusion", "redundancy", "pedestrian detection", "false-negative"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-008",
-    "text": "The APA interface shall provide the driver with real-time visual feedback of the detected parking space boundary overlay on the Camera360 surround-view image. REQ-005 shall be satisfied first.",
-    "type": "interface",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["HMI", "visualization", "overlay", "feedback"],
-    "source": "HMI_SPEC_v1.1"
-  },
-  {
-    "id": "REQ-009",
-    "text": "All parking functions shall maintain a maximum lateral positioning error of ±5 cm relative to the target parking slot centerline, measured under nominal environmental conditions (dry road, daylight).",
+    "id": "APA-002",
+    "text": "The trajectory planning module of APA-001 shall compute a collision-free parking path within 500 ms of slot confirmation. The path shall be replanned continuously at 50 ms intervals to account for dynamic obstacles detected by the obstacle detection subsystem as defined in PER-003.",
     "type": "performance",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["accuracy", "lateral control", "positioning", "tolerance"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["trajectory", "path-planning", "latency", "replanning"]
   },
   {
-    "id": "REQ-010",
-    "text": "The system shall log all sensor data, ECU states, driver interactions, and system decisions during parking maneuvers with a timestamp accuracy of ±1 ms for post-hoc analysis and ISO 26262 certification evidence.",
+    "id": "APA-003",
+    "text": "The APA electronic control unit (ECU) shall implement ASIL-B integrity level as required by ISO 26262 Part 5 for steer-by-wire actuator commands. All safety-relevant signals between the parking ECU and the steering ECU shall use E2E protection profile P02.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["ASIL-B", "ECU", "steer-by-wire", "E2E-protection", "ISO26262"]
+  },
+  {
+    "id": "APA-004",
+    "text": "During active APA maneuver, the driver shall maintain continuous visual monitoring of the vehicle surroundings and must be prepared to press the brake pedal or release the control button at any time to immediately abort the maneuver. APA shall not conflict with any concurrent active ADAS feature as defined in SYS-001.",
+    "type": "safety",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["driver-monitoring", "abort", "takeover", "conflict-management"]
+  },
+  {
+    "id": "RPA-001",
+    "text": "The Remote Parking Assist function shall enable the driver to maneuver the vehicle into or out of a parking space from outside the vehicle via a dedicated smartphone application or key fob. The driver must be within 6 metres line-of-sight of the vehicle during the entire maneuver.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["RPA", "remote-control", "smartphone", "line-of-sight"]
+  },
+  {
+    "id": "RPA-002",
+    "text": "The RPA communication channel between the smartphone application and the vehicle gateway ECU shall use Bluetooth Low Energy 5.2 with AES-128 encryption. End-to-end latency shall not exceed 100 ms under nominal channel conditions to satisfy the real-time control requirement of RPA-001.",
     "type": "non_functional",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["logging", "traceability", "certification", "timestamp"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["BLE", "encryption", "latency", "cybersecurity", "communication"]
   },
   {
-    "id": "REQ-011",
-    "text": "The APA system shall detect parking slot type (parallel, perpendicular, angled) with a classification accuracy of at least 98% under conditions defined in REQ-001.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["slot classification", "parallel", "perpendicular", "angled"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-012",
-    "text": "The parking trajectory planner shall compute a collision-free path using a minimum turning radius of 5.8 meters, consistent with the vehicle's kinematic constraints. REQ-003 applies.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["trajectory planning", "turning radius", "kinematics", "collision-free"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-013",
-    "text": "The Remote Parking Assist function shall not operate if the wireless communication link between the mobile device and the vehicle has a latency greater than 100ms or a packet loss rate above 2%.",
+    "id": "RPA-003",
+    "text": "The RPA system shall achieve ASIL-D decomposition for the dead-man switch (continuous button press) monitoring function, as the loss of this function could lead to uncontrolled vehicle movement with no driver inside. This supersedes the ASIL-B allocation of APA-003 for shared actuator paths.",
     "type": "safety",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["RPA", "communication", "latency", "packet loss", "wireless"],
-    "source": "SAFETY_PLAN_v2.0"
+    "tags": ["ASIL-D", "dead-man-switch", "decomposition", "ISO26262"]
   },
   {
-    "id": "REQ-014",
-    "text": "The parking system shall comply with ISO 26262 Part 6 (Software Level) requirements for safety-related embedded software, including MISRA-C coding guidelines and MC/DC test coverage of at least 90%.",
+    "id": "SUM-001",
+    "text": "The Summon function shall autonomously navigate the vehicle from a parking space to a pre-defined pick-up zone designated by the driver via the connected vehicle app. The maximum travel distance for summon shall not exceed 50 m and vehicle speed shall be limited to 5 km/h. Summon depends on the slot classification capability of APA-001.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["Summon", "autonomous-navigation", "pick-up-zone", "geofence"]
+  },
+  {
+    "id": "SUM-002",
+    "text": "The Summon function shall be disabled automatically if the ultrasonic sensor self-test defined in SEN-001 reports a fault, if GPS positioning error exceeds 0.5 m RMS, or if the vehicle-to-cloud heartbeat latency exceeds 200 ms. All three conditions shall trigger a safe state transition and driver notification via the HMI.",
     "type": "safety",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["ISO26262", "MISRA-C", "MC/DC", "software safety", "test coverage"],
-    "source": "SAFETY_PLAN_v2.0"
+    "tags": ["safe-state", "GPS", "cloud-connectivity", "fault-management", "HMI"]
   },
   {
-    "id": "REQ-015",
-    "text": "The APA end-to-end maneuver duration shall not exceed 90 seconds for perpendicular parking and 120 seconds for parallel parking, measured from slot detection to engine-off.",
+    "id": "SEN-001",
+    "text": "The ultrasonic sensor array shall consist of 12 sensors (4 front, 4 rear, 2 front-corner, 2 rear-corner) operating at 48 kHz. Each sensor shall perform a self-test at system startup and every 500 ms during active parking modes. Detection range shall be 0.2 m to 5.5 m with a lateral resolution of +/-0.1 m. SEN-001 is a precondition for APA-001.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["ultrasonic", "sensor-array", "self-test", "detection-range"]
+  },
+  {
+    "id": "SEN-002",
+    "text": "The 360-degree surround-view camera system shall comprise four fisheye cameras (front, rear, left, right) with a minimum resolution of 1280x960 pixels at 30 fps. The image stitching pipeline shall produce a calibrated bird-eye view within 50 ms and deliver it to the APA-001 slot detection module and the SUM-001 navigation pipeline.",
+    "type": "functional",
+    "sae_level": "L2",
+    "domain": "parking",
+    "tags": ["camera", "surround-view", "fisheye", "image-stitching", "bird-eye"]
+  },
+  {
+    "id": "PER-003",
+    "text": "The obstacle detection subsystem shall identify static and dynamic obstacles within the parking maneuver envelope using sensor fusion of SEN-001 ultrasonic data and SEN-002 camera data. A detected obstacle shall trigger a vehicle stop within 150 ms. False positive rate shall be below 0.1% under nominal lighting and weather conditions.",
     "type": "performance",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["maneuver time", "perpendicular", "parallel", "end-to-end"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["obstacle-detection", "sensor-fusion", "response-time", "false-positive"]
   },
   {
-    "id": "REQ-016",
-    "text": "The system shall detect static obstacles within the parking corridor using ultrasonic sensor data and halt the maneuver within 150ms of detecting an obstacle closer than 30 cm to the vehicle body.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["obstacle detection", "static obstacle", "emergency stop", "clearance"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-017",
-    "text": "The Camera360 image processing pipeline shall operate with a processing latency of less than 80ms end-to-end, from raw frame capture to lane and slot boundary output. REQ-005 is a prerequisite.",
-    "type": "performance",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["image processing", "latency", "pipeline", "frame rate"],
-    "source": "HW_SPEC_v1.0"
-  },
-  {
-    "id": "REQ-018",
-    "text": "The parking ECU shall implement a watchdog mechanism with a maximum timeout of 10ms to detect and recover from software faults in the trajectory planning and sensor fusion modules.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["watchdog", "fault detection", "ECU", "timeout", "recovery"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-019",
-    "text": "All safety-relevant inter-module communication within the parking ECU shall use CRC-32 checksums and sequence numbers to detect data corruption or message loss per AUTOSAR COM specification.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["CRC", "AUTOSAR", "communication", "data integrity", "checksums"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-020",
-    "text": "The Summon function shall maintain a geofenced operational boundary of 50 meters from the user's mobile device. The function shall terminate if the vehicle exits this boundary. REQ-006 applies.",
+    "id": "HMI-001",
+    "text": "The parking HMI shall provide real-time visual feedback of the surround-view camera image, detected parking slot boundaries, planned trajectory, and active sensor status during all modes of SYS-001. Alerts for takeover requests or system faults shall be displayed within 200 ms and accompanied by an auditory signal of at least 65 dB.",
     "type": "functional",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["summon", "geofence", "boundary", "mobile device"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["HMI", "display", "alerts", "auditory", "real-time-feedback"]
   },
   {
-    "id": "REQ-021",
-    "text": "The parking HMI shall display the number of parking maneuver steps remaining and the current vehicle position relative to the target slot on the instrument cluster with a refresh rate of at least 10Hz.",
-    "type": "interface",
+    "id": "HMI-002",
+    "text": "In the event of a critical safety fault (ASIL-B or higher as classified in SYS-002), the HMI defined in HMI-001 shall display a persistent red warning and initiate a controlled stop of the active parking maneuver. The driver shall be required to acknowledge the fault before any parking mode from SYS-001 can be re-activated.",
+    "type": "safety",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["HMI", "instrument cluster", "maneuver steps", "refresh rate"],
-    "source": "HMI_SPEC_v1.1"
+    "tags": ["safety-fault", "controlled-stop", "driver-acknowledgement", "ASIL"]
   },
   {
-    "id": "REQ-022",
-    "text": "The APA system shall support a minimum of 3 consecutive parking maneuver attempts before requiring a system restart, maintaining state consistency across attempts. REQ-003 and REQ-012 must be satisfied.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["retry logic", "state management", "consecutive attempts"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-023",
-    "text": "The parking system shall be capable of operating in parking garages with ceiling heights of at least 1.9 meters without sensor degradation. The Camera360 system shall compensate for low-light conditions below 1 lux.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["parking garage", "ceiling height", "low-light", "sensor compensation"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-024",
-    "text": "The Automatic Parking Assist software shall be updatable via OTA (Over-The-Air) mechanism using ISO 14229-compliant UDS diagnostics, with rollback capability to the last known stable version within 5 minutes.",
+    "id": "VER-001",
+    "text": "Verification of APA-001, RPA-001, and SUM-001 functional requirements shall be conducted using model-in-the-loop (MIL) simulation covering at least 500 representative parking scenarios including edge cases for sensor degradation, adverse weather, and mixed pedestrian and vehicle environments. Pass criteria: zero safety violations, slot detection accuracy above 98%.",
     "type": "non_functional",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["OTA", "UDS", "ISO14229", "software update", "rollback"],
-    "source": "SYS_SPEC_v1.2"
+    "tags": ["verification", "MIL", "simulation", "test-coverage", "acceptance-criteria"]
   },
   {
-    "id": "REQ-025",
-    "text": "The sensor fusion module shall detect and flag dynamic obstacles (pedestrians, cyclists) moving at speeds above 0.5 m/s within a 5-meter radius of the vehicle using Camera360 and ultrasonic sensor data jointly.",
+    "id": "VER-002",
+    "text": "The functional safety case for RPA-003 ASIL-D decomposition shall be documented as a safety case argument in accordance with ISO 26262 Part 2. The argument shall demonstrate independence between the two ASIL-B channels and provide quantitative evidence of the achieved probability of failure per hour below 10^-8.",
     "type": "safety",
     "sae_level": "L2",
     "domain": "parking",
-    "tags": ["dynamic obstacle", "pedestrian", "cyclist", "sensor fusion", "radius"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-026",
-    "text": "The parking system shall provide a SOTIF (Safety of the Intended Functionality, ISO 21448) analysis for all operational design domains, identifying reasonably foreseeable misuse scenarios for APA and RPA functions.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["SOTIF", "ISO21448", "ODD", "misuse", "foreseeable scenarios"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-027",
-    "text": "The parking trajectory controller shall use a model predictive control (MPC) algorithm with a prediction horizon of at least 2 seconds and a control horizon of 0.5 seconds for smooth, curvature-continuous paths.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["MPC", "model predictive control", "trajectory", "curvature", "control horizon"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-028",
-    "text": "The Remote Parking Assist user application shall authenticate the user via two-factor authentication before enabling any vehicle motion command. The session key shall expire after 30 minutes of inactivity.",
-    "type": "non_functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["authentication", "2FA", "RPA", "security", "session management"],
-    "source": "SYS_SPEC_v1.2"
-  },
-  {
-    "id": "REQ-029",
-    "text": "The parking ECU shall perform a self-test (POST — Power-On Self Test) covering all safety-critical components within 2 seconds of ignition-on, reporting any fault to the vehicle fault memory via DTC codes per ISO 14229.",
-    "type": "safety",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["POST", "self-test", "DTC", "fault memory", "ISO14229", "ignition"],
-    "source": "SAFETY_PLAN_v2.0"
-  },
-  {
-    "id": "REQ-030",
-    "text": "All parking functions shall be disabled when the ambient temperature is below -20°C or above +70°C, as the ultrasonic sensor performance falls outside the validated operational range. REQ-001 depends on this constraint.",
-    "type": "functional",
-    "sae_level": "L2",
-    "domain": "parking",
-    "tags": ["temperature", "operational range", "disable", "environmental constraint"],
-    "source": "HW_SPEC_v1.0"
+    "tags": ["safety-case", "ASIL-D", "PFH", "independence", "ISO26262"]
   }
 ]

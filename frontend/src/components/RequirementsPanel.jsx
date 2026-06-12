@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Upload, Play, Trash2, Tag, Wifi } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Upload, Play, Trash2, Tag, Wifi, FileUp, AlertTriangle } from 'lucide-react'
 import { fetchSampleRequirements, addRequirements, buildGraph, wakeBackend } from '../lib/api'
 import clsx from 'clsx'
 
@@ -11,16 +11,65 @@ const TYPE_COLORS = {
   interface:      'bg-green-500/20 text-green-300 border-green-500/30',
 }
 
+// ─── File parsers ────────────────────────────────────────────────────────────
+function parseJSON(text) {
+  const data = JSON.parse(text)
+  return Array.isArray(data) ? data : data.requirements ?? []
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n')
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+  return lines.slice(1).map((line, i) => {
+    const vals = line.match(/(".*?"|[^,]+)/g) ?? []
+    const obj = {}
+    headers.forEach((h, j) => { obj[h] = (vals[j] ?? '').replace(/^"|"$/g, '').trim() })
+    return {
+      id:        obj.id        || `UPLOAD-${String(i + 1).padStart(3, '0')}`,
+      text:      obj.text      || obj.description || obj.requirement || '',
+      type:      obj.type      || 'functional',
+      sae_level: obj.sae_level || obj.sae || 'L2',
+      domain:    obj.domain    || 'parking',
+      tags:      obj.tags ? obj.tags.split(';').map(t => t.trim()) : [],
+    }
+  }).filter(r => r.text)
+}
+
 export default function RequirementsPanel({ onGraphBuilt }) {
   const [reqs, setReqs] = useState([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [backendAwake, setBackendAwake] = useState(false)
+  const [uploadError, setUploadError] = useState(null)
+  const fileRef = useRef(null)
 
   // Silently wake the backend as soon as the panel mounts
   useEffect(() => {
     wakeBackend().then(() => setBackendAwake(true))
   }, [])
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadError(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result
+        let parsed
+        if (file.name.endsWith('.json')) parsed = parseJSON(text)
+        else if (file.name.endsWith('.csv')) parsed = parseCSV(text)
+        else throw new Error('Only .json and .csv files are supported')
+        if (!parsed.length) throw new Error('No valid requirements found in file')
+        setReqs(parsed)
+        setStatus(`Loaded ${parsed.length} requirements from ${file.name}`)
+      } catch (err) {
+        setUploadError(err.message)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
 
   async function loadSample() {
     setLoading(true)
@@ -64,6 +113,22 @@ export default function RequirementsPanel({ onGraphBuilt }) {
         <button onClick={loadSample} disabled={loading} className="btn-primary flex items-center gap-1.5">
           <Upload size={13} /> Load Sample Dataset
         </button>
+        {/* File upload */}
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={loading}
+          className="btn-ghost flex items-center gap-1.5 border border-slate-600/60 hover:border-brand-500/50"
+          title="Upload your own .json or .csv requirements file"
+        >
+          <FileUp size={13} /> Upload File
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,.csv"
+          className="hidden"
+          onChange={handleFileUpload}
+        />
         <button
           onClick={handleBuildGraph}
           disabled={!reqs.length || loading}
@@ -72,7 +137,7 @@ export default function RequirementsPanel({ onGraphBuilt }) {
           <Play size={13} /> Build Knowledge Graph
         </button>
         {reqs.length > 0 && (
-          <button onClick={() => setReqs([])} className="btn-ghost flex items-center gap-1.5">
+          <button onClick={() => { setReqs([]); setUploadError(null) }} className="btn-ghost flex items-center gap-1.5">
             <Trash2 size={12} /> Clear
           </button>
         )}
@@ -83,6 +148,15 @@ export default function RequirementsPanel({ onGraphBuilt }) {
           </span>
         </span>
       </div>
+
+      {/* Upload error */}
+      {uploadError && (
+        <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+          <AlertTriangle size={12} className="shrink-0" />
+          {uploadError}
+          <span className="ml-1 text-slate-500">— Expected: JSON array or CSV with columns: id, text, type, sae_level</span>
+        </div>
+      )}
 
       {/* Stats */}
       {reqs.length > 0 && (
