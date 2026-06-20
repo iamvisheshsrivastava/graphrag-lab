@@ -8,7 +8,9 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/graph", tags=["graph"])
 
-# In-memory state (NetworkX) — Neo4j used for persistence + Cypher queries
+# In-memory state (NetworkX) — fast traversal for GraphRAG retrieval
+# Neo4j AuraDB stores the same graph for durable Cypher queries across restarts
+# TODO: on service restart, reload graph from Neo4j instead of requiring a rebuild
 _current_graph: KnowledgeGraph | None = None
 _current_requirements = []
 
