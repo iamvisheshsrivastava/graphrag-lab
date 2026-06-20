@@ -23,6 +23,9 @@ from typing import Any, List, Dict
 
 logger = logging.getLogger(__name__)
 
+# gemini-2.0-flash-001: best cost/quality tradeoff for structured JSON extraction
+# ~$0.10/1M input tokens; deterministic at temperature=0.0
+# Alternatives tried: gemma-4-31b-it:free (unreliable JSON), gpt-4o-mini (slightly pricier)
 EXTRACTION_MODEL = "google/gemini-2.0-flash-001"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
