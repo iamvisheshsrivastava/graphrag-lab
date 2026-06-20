@@ -47,6 +47,30 @@ def get_current_graph():
     return _current_graph
 
 
+@router.get("/stats")
+def get_graph_stats():
+    """Quick graph health summary — useful for debugging and front-end dashboards."""
+    if _current_graph is None:
+        return {"built": False}
+    node_types: dict = {}
+    for n in _current_graph.nodes:
+        t = n.type
+        node_types[t] = node_types.get(t, 0) + 1
+    rel_types: dict = {}
+    for e in _current_graph.edges:
+        r = e.relation
+        rel_types[r] = rel_types.get(r, 0) + 1
+    return {
+        "built": True,
+        "extraction": _current_graph.metadata.get("extraction", "unknown"),
+        "node_count": len(_current_graph.nodes),
+        "edge_count": len(_current_graph.edges),
+        "node_types": node_types,
+        "relation_types": rel_types,
+        "is_dag": _current_graph.metadata.get("is_dag", None),
+    }
+
+
 @router.get("/traceability/{req_id}", response_model=list[TraceabilityLink])
 def get_traceability(req_id: str):
     links = graph_builder.get_traceability(req_id)
