@@ -8,4 +8,6 @@ services:
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false   # set this manually in the Render dashboard
+      - key: OPENROUTER_MODEL
+        value: google/gemini-2.5-flash
     autoDeploy: true
