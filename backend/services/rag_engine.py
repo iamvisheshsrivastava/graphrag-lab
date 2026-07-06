@@ -18,7 +18,7 @@ except ImportError:
     _openai_available = False
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-FREE_MODEL = "google/gemma-4-31b-it:free"
+QUERY_MODEL = "google/gemini-2.0-flash-001"  # cheap, reliable, good at structured reasoning
 
 
 SYSTEM_PROMPT = """You are an expert in automotive systems engineering and requirements analysis for ADAS functions.
@@ -31,7 +31,7 @@ Flag any requirements that appear incomplete, ambiguous, or inconsistent with IS
 class RAGEngine:
     def __init__(self):
         self._client: Optional[object] = None
-        self._model = FREE_MODEL
+        self._model = QUERY_MODEL
 
     def _get_client(self):
         if not _openai_available:
@@ -45,7 +45,7 @@ class RAGEngine:
                 base_url=OPENROUTER_BASE_URL,
                 default_headers={"HTTP-Referer": "https://github.com/iamvisheshsrivastava/graphrag-lab"},
             )
-            self._model = FREE_MODEL
+            self._model = QUERY_MODEL
         elif oa_key:
             self._client = AsyncOpenAI(api_key=oa_key)
             self._model = "gpt-4o"
