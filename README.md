@@ -1,20 +1,22 @@
 # GraphRAG — Automotive Requirements Knowledge Graph
 
-A research tool for building **deterministic, domain-specific knowledge graphs** from automotive requirements text and querying them using **Graph-Retrieval-Augmented-Generation (GraphRAG)**.
+A research tool for building **LLM-powered, domain-specific knowledge graphs** from automotive requirements text and querying them using **Graph-Retrieval-Augmented-Generation (GraphRAG)**.
 
-The system targets ADAS and parking function requirements (SAE Level 2), supporting formal traceability, consistency verification, and natural language querying grounded in an automotive ontology.
+Targets ADAS and parking function requirements (SAE Level 2) with full traceability, consistency verification, natural language querying, and persistent graph storage via Neo4j AuraDB.
+
+Built as a portfolio project supporting a PhD application in AI-based GraphRAG for automotive functions.
 
 ---
 
-## Motivation
+## Live Demo
 
-Requirements engineering in safety-critical systems (ISO 26262, SOTIF) involves large, interdependent sets of textual requirements. Analysing their dependencies, detecting ambiguities, and producing certification evidence is largely manual today.
+| Layer | URL |
+|---|---|
+| Frontend (Vercel) | https://graphrag-lab.vercel.app |
+| Backend API (Render) | https://graphrag-lab-api.onrender.com |
+| API Docs (Swagger) | https://graphrag-lab-api.onrender.com/docs |
 
-This project explores how knowledge graphs combined with LLM-based retrieval can make requirements analysis:
-- **Deterministic** — same inputs always produce the same graph structure
-- **Traceable** — every answer cites the graph nodes and edges it used
-- **Verifiable** — rule-based checks enforce domain standards without black-box ML
-- **Queryable** — natural language queries traversed via the graph before LLM generation
+> **Note:** The backend runs on Render's free tier and may take ~50 seconds to wake from cold start.
 
 ---
 
@@ -23,30 +25,34 @@ This project explores how knowledge graphs combined with LLM-based retrieval can
 ```
 graphrag-lab/
 ├── backend/
-│   ├── main.py                       # FastAPI app entrypoint
+│   ├── main.py                       # FastAPI app entrypoint + CORS config
+│   ├── .python-version               # Pins Python 3.11.0 for Render
 │   ├── models/schemas.py             # Pydantic data models
 │   ├── services/
 │   │   ├── ontology.py               # Automotive parking ontology (concepts, relations, rules)
-│   │   ├── graph_builder.py          # Deterministic KG construction + verification engine
-│   │   └── rag_engine.py             # GraphRAG = graph traversal + LLM generation
+│   │   ├── llm_extractor.py          # LLM-based entity + relation extraction (gemini-2.5-flash)
+│   │   ├── graph_builder.py          # KG construction: LLM extraction → ontology backbone
+│   │   ├── neo4j_service.py          # Neo4j AuraDB persistence + Cypher query runner
+│   │   └── rag_engine.py             # GraphRAG = BFS traversal + LLM generation
 │   ├── routers/
 │   │   ├── requirements.py           # CRUD + batch verification endpoints
-│   │   ├── graph.py                  # Build & inspect knowledge graph
-│   │   └── query.py                  # GraphRAG query endpoint
+│   │   ├── graph.py                  # Build, inspect, Neo4j status endpoints
+│   │   └── query.py                  # GraphRAG query + Cypher passthrough endpoints
 │   └── data/
-│       └── sample_requirements.json  # 30 SAE L2 ADAS parking requirements
+│       └── sample_requirements.json  # 18 rich ADAS parking requirements (SYS/APA/RPA/SUM/SEN/HMI/VER)
 │
 └── frontend/
     ├── src/
-    │   ├── App.jsx                   # Root layout + state
+    │   ├── App.jsx                   # Root layout + routing
     │   ├── components/
-    │   │   ├── Sidebar.jsx           # Navigation
-    │   │   ├── RequirementsPanel.jsx # Load, view, and manage requirements
+    │   │   ├── Sidebar.jsx           # Navigation (6 tabs)
+    │   │   ├── RequirementsPanel.jsx # Load sample data or upload JSON/CSV
     │   │   ├── GraphViewer.jsx       # Cytoscape.js interactive graph canvas
-    │   │   ├── QueryPanel.jsx        # GraphRAG query + answer display
-    │   │   ├── VerificationPanel.jsx # Rule-based ISO 26262 / SAE checks
-    │   │   └── TraceabilityPanel.jsx # Upstream/downstream dependency explorer
-    │   └── lib/api.js                # Axios API client
+    │   │   ├── QueryPanel.jsx        # GraphRAG natural language query + answer
+    │   │   ├── VerificationPanel.jsx # Rule-based ISO 26262 / SAE J3016 checks
+    │   │   ├── TraceabilityPanel.jsx # Upstream/downstream dependency explorer
+    │   │   └── CypherConsole.jsx     # Live Cypher query editor against Neo4j AuraDB
+    │   └── lib/api.js                # Axios API client + all endpoint wrappers
     └── package.json
 ```
 
@@ -54,37 +60,63 @@ graphrag-lab/
 
 ## Features
 
-### 1. Knowledge Graph Construction
-- Ontology-guided, keyword-based entity extraction — no probabilistic NER
-- Builds requirement-to-requirement dependency edges from explicit cross-references (e.g. `REQ-003`)
-- Detects semantic relations: `depends_on`, `refines`, `conflicts_with`, `derives_from`, `implements`, `mentions`
+### 1. LLM-Based Knowledge Graph Construction
+
+Graph building is a two-step pipeline:
+
+**Step 1 — LLM extraction** (`llm_extractor.py`)
+- Sends the full requirements batch to `google/gemini-2.5-flash` via OpenRouter in a single structured prompt
+- Returns strict JSON: `{"entities": [...], "relations": [...]}`
+- Temperature = 0.0 for near-deterministic output
+- Entity types: `sensor | function | concept | actor | safety_level | standard | system`
+- Relation types: `mentions | depends_on | derives_from | implements | governed_by | conflicts_with | refines | part_of | uses | connected_to`
+- Falls back to keyword matching if no API key is set
+
+**Step 2 — Ontology backbone** (`graph_builder.py`)
+- Merges LLM output with deterministic ontology edges defined in `ontology.py`
+- Scans requirement text for explicit cross-references (e.g. `APA-001`) and adds `depends_on` edges
 - Validates DAG property; topological ordering enables certifiable dependency analysis
 
-### 2. Domain Ontology
-Defined in `services/ontology.py`, covering:
-- **Functions:** AutomaticParkingAssist (APA), RemoteParkingAssist (RPA), SummonFunction
-- **Sensors:** UltrasonicSensor, Camera, Camera360, Radar, LiDAR
-- **Safety levels:** ASIL-B, ASIL-D, QM (ISO 26262)
-- **Actors:** Driver, Pedestrian, Vehicle
-- **Reasoning rules:** safety propagation, sensor redundancy, SAE L2 driver monitoring obligation
+### 2. Neo4j AuraDB Integration
 
-### 3. GraphRAG Query Engine
-- Top-k node retrieval by keyword scoring against the graph
-- BFS context expansion to depth 2 around seed nodes
-- Graph context serialized and injected into LLM prompt alongside the query
-- Fully deterministic fallback when no LLM key is configured
+- After every graph build, the full graph is persisted to Neo4j AuraDB via Cypher `MERGE`
+- Node labels: `:Requirement` and `:Entity`
+- In-memory NetworkX DiGraph is used for fast BFS traversal during GraphRAG retrieval
+- Neo4j failure is non-blocking — API response is not affected if Neo4j is down
 
-### 4. Requirements Verification
-Rule-based, reproducible checks — no LLM required:
+### 3. Cypher Console
+
+- Live query editor in the UI with 6 example Cypher queries pre-loaded
+- Shows Neo4j connection status + node count badge
+- Results rendered as a sortable table (columns + rows)
+- Ctrl+Enter to run — calls `POST /query/cypher` on the backend
+
+### 4. GraphRAG Query Engine
+
+- Top-k node retrieval by TF-IDF-style keyword scoring against the graph
+- BFS context expansion (depth 2) around seed nodes
+- Graph context serialized into the LLM prompt alongside the question
+- Answer is grounded in cited graph nodes — every response includes the traversal path
+- Model: `google/gemini-2.5-flash` via OpenRouter
+
+### 5. Requirements Input
+
+- **Load sample dataset** — 18 rich automotive requirements covering SYS, APA, RPA, SUM, SEN, HMI, VER domains
+- **Upload your own** — supports `.json` (array of requirement objects) and `.csv` files
+
+### 6. Verification Engine
+
+Rule-based, deterministic checks (no LLM required):
 - SAE L2 requirements must include a driver monitoring obligation
 - Safety requirements must reference an ISO 26262 ASIL level
 - Performance requirements must contain quantitative thresholds
 - Ambiguous language detection (`appropriate`, `adequate`, `as needed`, `if possible`, …)
 
-### 5. Traceability Matrix
+### 7. Traceability Matrix
+
 - Per-requirement upstream and downstream link explorer
 - Link types: `depends_on`, `derives_from`, `implements`, `conflicts_with`
-- Output format suitable for ISO 26262 Part 8 traceability evidence
+- Output suitable for ISO 26262 Part 8 traceability evidence
 
 ---
 
@@ -96,11 +128,11 @@ Rule-based, reproducible checks — no LLM required:
 cd backend
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env   # optional: add LLM key for AI-powered answers
+cp .env.example .env   # add your keys
 uvicorn main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
+API docs: http://localhost:8000/docs
 
 ### Frontend
 
@@ -110,34 +142,54 @@ npm install
 npm run dev
 ```
 
-UI available at: http://localhost:5173
+UI: http://localhost:5173
 
 ### Walkthrough
 
-1. **Requirements** tab → click **Load Sample Dataset** (30 ADAS parking requirements)
-2. Click **Build Knowledge Graph** → the app switches to the graph view automatically
-3. **Knowledge Graph** → click any node to inspect its properties and ontology links
-4. **GraphRAG Query** → ask natural language questions; see the graph traversal path used
-5. **Verification** → run deterministic ISO 26262 / SAE J3016 consistency checks
-6. **Traceability** → select any requirement to explore its full dependency chain
+1. **Requirements** → **Load Sample Dataset** (18 ADAS parking requirements)
+2. **Knowledge Graph** → **Generate Graph** (LLM extracts entities + relations)
+3. Click any node to inspect its properties and ontology links
+4. **GraphRAG Query** → ask natural language questions; see the traversal path used
+5. **Verification** → run ISO 26262 / SAE J3016 consistency checks
+6. **Traceability** → explore upstream/downstream dependency chains
+7. **Cypher Console** → run live Cypher queries against Neo4j AuraDB
 
 ---
 
-## LLM Configuration
+## Environment Variables
 
-The system works offline without an LLM key (deterministic graph-based answers). To enable AI-generated, grounded responses, create `backend/.env`:
+Create `backend/.env`:
 
 ```env
-# OpenRouter (free models available)
-OPENROUTER_API_KEY=sk-or-...
+# Required for LLM-based graph extraction and GraphRAG queries
+OPENROUTER_API_KEY=sk-or-v1-...
 
-# Or standard OpenAI
+# Optional: override the model (default: google/gemini-2.5-flash)
+OPENROUTER_MODEL=google/gemini-2.5-flash
+
+# Required for Neo4j AuraDB persistence and Cypher Console
+NEO4J_URI=neo4j+s://xxxxxxxx.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-password
+
+# Or use OpenAI directly (model switches to gpt-4o automatically)
 OPENAI_API_KEY=sk-...
 ```
 
-The backend auto-detects the key on startup. The root endpoint (`GET /`) reports `"llm_enabled": true` when active.
+The root endpoint (`GET /`) reports `"llm_enabled": true / false` and `"llm_provider": "openrouter" | "openai" | "none"`.
 
-Tested with `google/gemma-4-31b-it:free` via OpenRouter.
+Without any API key, the system falls back to keyword-based graph extraction and template-based query answers — fully functional for offline/demo use.
+
+---
+
+## Model Choice
+
+| Model | Provider | Cost | Used for |
+|---|---|---|---|
+| `google/gemini-2.5-flash` | OpenRouter | ~$0.15/1M tokens | Graph extraction + GraphRAG queries |
+| `gpt-4o` | OpenAI | ~$2.50/1M tokens | Auto-selected if only `OPENAI_API_KEY` is set |
+
+At typical demo usage (10 graph builds + 50 queries), total cost ≈ **$0.01–0.02**.
 
 ---
 
@@ -145,18 +197,23 @@ Tested with `google/gemma-4-31b-it:free` via OpenRouter.
 
 | Decision | Rationale |
 |---|---|
-| Deterministic ontology extraction over NER | Reproducible graph structure; no stochastic variance between runs |
-| Rule-based verification (no ML) | Certifiable, auditable evidence for functional safety standards |
-| NetworkX in-memory graph for MVP | Zero infrastructure dependency; Neo4j/AuraDB drop-in for production |
+| LLM extraction at temperature=0.0 | Near-deterministic graph structure; consistent across runs |
+| Ontology backbone merged after LLM | Guarantees domain concepts are always present regardless of LLM output |
+| Dual storage: NetworkX + Neo4j | NetworkX for fast in-process BFS; Neo4j for durable Cypher queries |
+| Rule-based verification (no ML) | Certifiable, auditable evidence for ISO 26262 functional safety |
 | Cytoscape.js for visualization | Handles large graphs client-side; no server render needed |
-| React + Vite | Lightweight dev stack; fast HMR; minimal configuration |
+| OpenRouter as LLM gateway | Single API key accesses 100+ models; easy model switching via env var |
+| Render free tier + Vercel CDN | Zero-cost hosting for portfolio demo |
 
 ---
 
 ## Roadmap
 
-- [ ] Neo4j / AuraDB integration for persistent graph storage and Cypher queries
-- [ ] spaCy or custom NER for richer, automated ontology concept extraction
+- [x] LLM-based entity + relation extraction
+- [x] Neo4j AuraDB integration for persistent Cypher-queryable graph storage
+- [x] Cypher Console in UI
+- [x] File upload for custom requirements (JSON / CSV)
+- [ ] Reload graph from Neo4j on service restart (currently requires manual rebuild)
 - [ ] SHACL / SPARQL constraint validation layer
 - [ ] Export to ReqIF format for integration with DOORS / Polarion
 - [ ] Multi-document ingestion (PDF, DOCX, Excel requirement sheets)
@@ -169,7 +226,7 @@ Tested with `google/gemma-4-31b-it:free` via OpenRouter.
 
 - SAE J3016: *Taxonomy and Definitions for Terms Related to Driving Automation Systems* (2021)
 - ISO 26262: *Road vehicles — Functional safety* (2018)
-- ISO 21448: *Road vehicles — Safety of the intended functionality (SOTIF)* (2022)
+- ISO 21448: *Road vehicles — Safety of the Intended Functionality (SOTIF)* (2022)
 - Edge, D. et al. (2024). *From Local to Global: A Graph RAG Approach to Query-Focused Summarization.* arXiv:2404.16130
 - Baader, F. et al. (2003). *The Description Logic Handbook.* Cambridge University Press.
 - Pan, J.Z. et al. (2023). *Unifying Large Language Models and Knowledge Graphs: A Roadmap.* IEEE TKDE.
