@@ -62,5 +62,5 @@ def root():
 
 @app.get("/health")
 def health():
-    # Used by frontend wake-on-mount to pre-warm Render free tier instance
+    # Used by frontend wake-on-mount to pre-warm Render free tier instance (redeploy trigger)
     return {"status": "ok"}
