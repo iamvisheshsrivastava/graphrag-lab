@@ -18,7 +18,7 @@ except ImportError:
     _openai_available = False
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-QUERY_MODEL = "google/gemini-2.0-flash-001"  # cheap, reliable, good at structured reasoning
+QUERY_MODEL = "google/gemini-2.5-flash"  # current Gemini flash — cheap, reliable, good at structured reasoning
 
 
 SYSTEM_PROMPT = """You are an expert in automotive systems engineering and requirements analysis for ADAS functions.

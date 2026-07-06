@@ -1,7 +1,7 @@
 """
 LLM-based entity and relation extractor for knowledge graph construction.
 
-Uses google/gemini-2.0-flash-001 via OpenRouter — cheap (~$0.10/1M tokens)
+Uses google/gemini-2.5-flash via OpenRouter — cheap (~$0.15/1M tokens)
 and reliable for structured JSON output.
 
 For each batch of requirements it returns:
@@ -23,10 +23,10 @@ from typing import Any, List, Dict
 
 logger = logging.getLogger(__name__)
 
-# gemini-2.0-flash-001: best cost/quality tradeoff for structured JSON extraction
-# ~$0.10/1M input tokens; deterministic at temperature=0.0
-# Alternatives tried: gemma-4-31b-it:free (unreliable JSON), gpt-4o-mini (slightly pricier)
-EXTRACTION_MODEL = "google/gemini-2.0-flash-001"
+# gemini-2.5-flash: best cost/quality tradeoff for structured JSON extraction
+# ~$0.15/1M input tokens; deterministic at temperature=0.0
+# Alternatives: gemma-3-27b-it:free (unreliable JSON), gpt-4o-mini (slightly pricier)
+EXTRACTION_MODEL = "google/gemini-2.5-flash"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 EXTRACTION_SYSTEM_PROMPT = """You are a knowledge graph construction engine for automotive ADAS requirements.
