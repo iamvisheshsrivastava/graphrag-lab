@@ -8,7 +8,7 @@ import routers.graph as graph_router
 router = APIRouter(prefix="/query", tags=["query"])
 
 
-@router.post("/", response_model=QueryResult)
+@router.post("", response_model=QueryResult)
 async def graphrag_query(request: QueryRequest):
     if graph_router._current_graph is None:
         raise HTTPException(400, detail="Build a knowledge graph first via POST /graph/build")

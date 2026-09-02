@@ -21,12 +21,12 @@ def get_sample_requirements():
     return [Requirement(**r) for r in raw]
 
 
-@router.get("/", response_model=list[Requirement])
+@router.get("", response_model=list[Requirement])
 def list_requirements():
     return list(_store.values())
 
 
-@router.post("/", response_model=Requirement)
+@router.post("", response_model=Requirement)
 def add_requirement(req: Requirement):
     _store[req.id] = req
     return req
