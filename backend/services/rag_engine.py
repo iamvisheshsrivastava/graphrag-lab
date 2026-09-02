@@ -99,9 +99,22 @@ class RAGEngine:
                     {"role": "user", "content": f"{context}\n\nQuestion: {request.query}"},
                 ]
                 response = await client.chat.completions.create(
-                    model=self._model, messages=messages, temperature=0.1, max_tokens=800
+                    # GLM-4.6 (and other reasoning models) spend max_tokens on
+                    # hidden reasoning before emitting the visible answer -
+                    # 800 was consumed entirely by reasoning, leaving
+                    # message.content as None and failing QueryResult's
+                    # validation. 800 was sized for a non-reasoning model
+                    # (the previous Gemini default).
+                    model=self._model, messages=messages, temperature=0.1, max_tokens=3000
                 )
                 answer = response.choices[0].message.content
+                if not answer:
+                    # Model ran out of budget before producing visible
+                    # content (or returned an empty string) - fall back
+                    # rather than let QueryResult's str-typed answer field
+                    # reject None.
+                    logger.warning("LLM returned empty/null content for query %r", request.query)
+                    answer = self._fallback_answer(request.query, relevant_nodes, traversal_path)
             except Exception as e:
                 # Log the real error server-side only — never echo raw
                 # provider/exception details to the client (see issue #7).
