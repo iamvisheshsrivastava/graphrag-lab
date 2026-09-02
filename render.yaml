@@ -9,5 +9,5 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false   # set this manually in the Render dashboard
       - key: OPENROUTER_MODEL
-        value: google/gemini-2.5-flash
+        value: z-ai/glm-4.6
     autoDeploy: true

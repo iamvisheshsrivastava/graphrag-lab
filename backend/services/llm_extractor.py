@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # gemini-2.5-flash: best cost/quality tradeoff for structured JSON extraction
 # ~$0.15/1M input tokens; deterministic at temperature=0.0
 # Alternatives: gemma-3-27b-it:free (unreliable JSON), gpt-4o-mini (slightly pricier)
-EXTRACTION_MODEL = "google/gemini-2.5-flash"
+EXTRACTION_MODEL = os.getenv("OPENROUTER_MODEL", "z-ai/glm-4.6")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 EXTRACTION_SYSTEM_PROMPT = """You are a knowledge graph construction engine for automotive ADAS requirements.

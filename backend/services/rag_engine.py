@@ -18,7 +18,8 @@ except ImportError:
     _openai_available = False
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-QUERY_MODEL = "google/gemini-2.5-flash"  # current Gemini flash — cheap, reliable, good at structured reasoning
+# Read from env so model can be changed in Render dashboard without redeploying code
+QUERY_MODEL = os.getenv("OPENROUTER_MODEL", "z-ai/glm-4.6")
 
 
 SYSTEM_PROMPT = """You are an expert in automotive systems engineering and requirements analysis for ADAS functions.
