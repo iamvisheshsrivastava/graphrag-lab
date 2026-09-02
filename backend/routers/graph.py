@@ -11,6 +11,20 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 # In-memory state (NetworkX) — fast traversal for GraphRAG retrieval
 # Neo4j AuraDB stores the same graph for durable Cypher queries across restarts
 # TODO: on service restart, reload graph from Neo4j instead of requiring a rebuild
+#
+# KNOWN LIMITATION (issue #6, deliberately out of scope for this pass):
+# This state is a module-level global, which means: (1) it's lost whenever
+# the process restarts (Render free tier sleeps/restarts often), (2) it is
+# NOT safe if uvicorn is ever run with --workers > 1 (each worker gets its
+# own copy, so requests would see inconsistent state), and (3) every caller
+# shares one global graph — one user's POST /graph/build silently replaces
+# another's. query.py also reaches into this module's private global
+# (graph_router._current_graph), which is a brittle cross-module coupling.
+# Fixing this properly means: reloading from Neo4j on startup, moving state
+# into a GraphStore service injected via FastAPI Depends, and eventually
+# per-session/per-graph IDs so multiple graphs can coexist. That's a real
+# architectural change (state model + dependency wiring + Neo4j reload path)
+# and is deliberately not attempted in this pass — see issue #6.
 _current_graph: KnowledgeGraph | None = None
 _current_requirements = []
 

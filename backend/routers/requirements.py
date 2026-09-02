@@ -6,6 +6,9 @@ from services.graph_builder import graph_builder
 
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
+# Same module-level-global limitation as backend/routers/graph.py — lost on
+# restart, unsafe with multiple workers, shared across all callers. See the
+# detailed note there and issue #6; deliberately out of scope for this pass.
 _store: dict[str, Requirement] = {}
 
 DATA_PATH = Path(__file__).parent.parent / "data" / "sample_requirements.json"

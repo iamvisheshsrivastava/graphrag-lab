@@ -198,28 +198,71 @@ class GraphBuilder:
         return list(set(found))
 
     def _extract_relations_kw(self, req_id: str, text: str) -> List[Tuple[str, str, str]]:
-        edges = []
+        # DEPENDENCY_KEYWORDS only tells us *what kind* of dependency language
+        # this requirement uses, not a specific target node — there is no real
+        # node id to point that relation at. So instead of emitting an edge to
+        # a placeholder id (which was never a real graph node — see issue #8),
+        # use the matched keyword's relation type for this requirement's
+        # explicit REQ-xxx cross-references, which *do* have real targets.
         text_lower = text.lower()
+        matched_rel_type = "depends_on"
+        for rel_type, keywords in DEPENDENCY_KEYWORDS.items():
+            if any(kw.lower() in text_lower for kw in keywords):
+                matched_rel_type = rel_type
+                break
+
+        edges = []
         refs = re.findall(r"REQ-\d+", text, re.IGNORECASE)
         for ref in refs:
             ref_upper = ref.upper()
             if ref_upper != req_id:
-                edges.append((req_id, ref_upper, "depends_on"))
-        for rel_type, keywords in DEPENDENCY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_lower:
-                    edges.append((req_id, "ONTOLOGY", rel_type))
-                    break
+                edges.append((req_id, ref_upper, matched_rel_type))
         return edges
 
     # ─── Ontology backbone ────────────────────────────────────────────────────
 
+    # PARKING_ONTOLOGY["relations"] endpoints are mostly abstract parent
+    # category names (e.g. "Sensor", "SafetyLevel") that are never node ids
+    # by themselves — they only ever appear as a concept's "parent" value, or
+    # (for requirement categories) correspond to a Requirement's `type`
+    # field rather than any concept id at all. Matching them literally
+    # against self.graph.nodes meant 7 of 8 backbone relations could never
+    # fire (see issue #9). _resolve_ontology_endpoint expands each category
+    # name to every concrete node currently in the graph that belongs to it.
+    _REQUIREMENT_TYPE_CATEGORIES = {
+        "SafetyRequirement":      "safety",
+        "FunctionalRequirement":  "functional",
+        "PerformanceRequirement": "performance",
+        "InterfaceRequirement":   "interface",
+    }
+
+    def _resolve_ontology_endpoint(self, name: str) -> List[str]:
+        # 1. Already a concrete node id (e.g. "UltrasonicSensor", "ISO26262").
+        if name in self.graph.nodes:
+            return [name]
+        # 2. A requirement-type category (e.g. "SafetyRequirement") — resolve
+        #    to every requirement node whose `type` matches.
+        req_type = self._REQUIREMENT_TYPE_CATEGORIES.get(name)
+        if req_type:
+            return [
+                n for n, data in self.graph.nodes(data=True)
+                if data.get("node_type") == "requirement" and data.get("req_type") == req_type
+            ]
+        # 3. An abstract concept-parent category (e.g. "Sensor", "Environment",
+        #    "SafetyLevel", "ParkingFunction") — resolve to every concrete
+        #    concept node in the graph whose ontology "parent" matches.
+        return [
+            cid for cid, meta in PARKING_ONTOLOGY["concepts"].items()
+            if meta.get("parent") == name and cid in self.graph.nodes
+        ]
+
     def _add_ontology_backbone(self, nodes, edges):
         for src, rel, tgt in PARKING_ONTOLOGY["relations"]:
-            if src in self.graph.nodes and tgt in self.graph.nodes:
-                if not self.graph.has_edge(src, tgt):
-                    edges.append(GraphEdge(source=src, target=tgt, relation=rel))
-                    self.graph.add_edge(src, tgt, relation=rel)
+            for src_id in self._resolve_ontology_endpoint(src):
+                for tgt_id in self._resolve_ontology_endpoint(tgt):
+                    if src_id != tgt_id and not self.graph.has_edge(src_id, tgt_id):
+                        edges.append(GraphEdge(source=src_id, target=tgt_id, relation=rel))
+                        self.graph.add_edge(src_id, tgt_id, relation=rel)
         return nodes, edges
 
     # ─── Traceability + Verification ─────────────────────────────────────────

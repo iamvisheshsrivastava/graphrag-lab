@@ -5,8 +5,11 @@ When OPENAI_API_KEY is set, uses GPT-4o for answer generation.
 Without a key, falls back to a deterministic template-based response.
 """
 
+import logging
 import os
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from models.schemas import QueryRequest, QueryResult, GraphNode, KnowledgeGraph
 from services.graph_builder import graph_builder
@@ -100,7 +103,13 @@ class RAGEngine:
                 )
                 answer = response.choices[0].message.content
             except Exception as e:
-                answer = f"LLM call failed: {e}\n\n{self._fallback_answer(request.query, relevant_nodes, traversal_path)}"
+                # Log the real error server-side only — never echo raw
+                # provider/exception details to the client (see issue #7).
+                logger.error("LLM call failed: %s", e)
+                answer = (
+                    "LLM answer generation is temporarily unavailable.\n\n"
+                    f"{self._fallback_answer(request.query, relevant_nodes, traversal_path)}"
+                )
         else:
             answer = self._fallback_answer(request.query, relevant_nodes, traversal_path)
 
