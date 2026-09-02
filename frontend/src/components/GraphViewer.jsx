@@ -127,7 +127,21 @@ export default function GraphViewer({ graph, highlightNodes = [] }) {
       container: containerRef.current,
       elements: toCytoElements(graph),
       style: CYTO_STYLE,
-      layout: { name: 'cose', animate: true, padding: 40, nodeRepulsion: 8000, idealEdgeLength: 80 },
+      // randomize + componentSpacing matter a lot here: this graph is mostly
+      // isolated single-node "components" (few edges relative to node count),
+      // and cose's default packing collapses those onto each other near the
+      // origin instead of spreading them - randomize gives every node a
+      // distinct starting position and componentSpacing pushes components
+      // apart during packing.
+      layout: {
+        name: 'cose',
+        animate: true,
+        padding: 40,
+        randomize: true,
+        componentSpacing: 120,
+        nodeRepulsion: 400000,
+        idealEdgeLength: 80,
+      },
       wheelSensitivity: 0.3,
     })
 
@@ -173,7 +187,7 @@ export default function GraphViewer({ graph, highlightNodes = [] }) {
             { icon: ZoomIn,     action: () => cyRef.current?.zoom(cyRef.current.zoom() * 1.2) },
             { icon: ZoomOut,    action: () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8) },
             { icon: Maximize2,  action: () => cyRef.current?.fit(undefined, 30) },
-            { icon: RotateCcw,  action: () => cyRef.current?.layout({ name: 'cose', animate: true }).run() },
+            { icon: RotateCcw,  action: () => cyRef.current?.layout({ name: 'cose', animate: true, randomize: true, componentSpacing: 120, nodeRepulsion: 400000, idealEdgeLength: 80 }).run() },
           ].map(({ icon: Icon, action }, i) => (
             <button key={i} onClick={action}
               className="w-7 h-7 bg-surface-900/90 border border-slate-700/70 rounded flex items-center justify-center text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors">
