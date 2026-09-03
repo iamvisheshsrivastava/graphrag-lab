@@ -264,6 +264,108 @@ def _serialize_record(record: dict) -> dict:
     return out
 
 
+# ─── Reload (startup) ─────────────────────────────────────────────────────────
+
+# Inverse of REL_MAP — Cypher relationship type -> the lowercase relation
+# name the rest of the app (GraphEdge.relation) uses.
+_INV_REL_MAP = {v: k for k, v in REL_MAP.items()}
+
+
+def load_graph() -> Optional[dict]:
+    """
+    Reload the most recently persisted graph from Neo4j into the
+    KnowledgeGraph dict shape (nodes/edges/metadata) used elsewhere in the
+    app. Returns None if Neo4j isn't configured/available, on any query
+    error, or if there's simply no data yet (fresh database).
+
+    This implements the startup half of issue #6: on process restart (the
+    common case on Render free tier), the in-memory NetworkX graph is empty
+    but Neo4j — if configured — still has the last-built graph, so we can
+    repopulate `_current_graph` without requiring the user to rebuild.
+    Requirement objects (`_current_requirements`) are not reconstructed —
+    nothing currently reads that list back out (see routers/graph.py).
+    """
+    if not NEO4J_AVAILABLE:
+        return None
+    driver = _driver()
+    if driver is None:
+        return None
+
+    try:
+        with driver.session(
+            database=os.getenv("NEO4J_DATABASE", "neo4j"),
+            default_access_mode=READ_ACCESS,
+        ) as session:
+            def _read(tx):
+                req_rows = tx.run(
+                    "MATCH (r:Requirement) RETURN r.id AS id, r.label AS label, "
+                    "r.text AS text, r.req_type AS req_type, "
+                    "r.sae_level AS sae_level, r.domain AS domain"
+                ).data()
+                entity_rows = tx.run(
+                    "MATCH (e:Entity) RETURN e.id AS id, e.label AS label, "
+                    "e.entity_type AS entity_type"
+                ).data()
+                edge_rows = tx.run(
+                    "MATCH (a)-[rel]->(b) "
+                    "WHERE (a:Requirement OR a:Entity) AND (b:Requirement OR b:Entity) "
+                    "RETURN a.id AS source, b.id AS target, type(rel) AS rel_type"
+                ).data()
+                return req_rows, entity_rows, edge_rows
+
+            req_rows, entity_rows, edge_rows = session.execute_read(_read)
+
+        if not req_rows and not entity_rows:
+            return None  # nothing persisted yet
+
+        nodes = []
+        for row in req_rows:
+            nodes.append({
+                "id": row["id"],
+                "label": row.get("label") or row["id"],
+                "type": "requirement",
+                "properties": {
+                    "text": row.get("text") or "",
+                    "req_type": row.get("req_type") or "",
+                    "sae_level": row.get("sae_level") or "",
+                    "domain": row.get("domain") or "",
+                },
+            })
+        for row in entity_rows:
+            nodes.append({
+                "id": row["id"],
+                "label": row.get("label") or row["id"],
+                "type": row.get("entity_type") or "concept",
+                "properties": {"label": row.get("label") or row["id"]},
+            })
+
+        edges = [
+            {
+                "source": row["source"],
+                "target": row["target"],
+                "relation": _INV_REL_MAP.get(row["rel_type"], row["rel_type"].lower()),
+            }
+            for row in edge_rows
+        ]
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "num_requirements": len(req_rows),
+                "num_entities": len(entity_rows),
+                "num_edges": len(edges),
+                "extraction": "neo4j-reload",
+            },
+        }
+
+    except Exception as e:
+        logger.error("Neo4j graph reload error: %s", e)
+        return None
+    finally:
+        driver.close()
+
+
 # ─── Health check ─────────────────────────────────────────────────────────────
 
 def neo4j_status() -> dict:

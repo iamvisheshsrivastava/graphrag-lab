@@ -5,6 +5,14 @@ const api = axios.create({
   timeout: 45000,   // Render free tier can take ~30s to wake up
 })
 
+// Optional shared API key (backend/security.py) — only sent when the
+// build defines VITE_API_KEY. When the backend has no API_KEY configured
+// (today's public-demo deployment), this header is simply ignored, so it's
+// safe to add unconditionally. See issue #2.
+if (import.meta.env.VITE_API_KEY) {
+  api.defaults.headers.common['X-API-Key'] = import.meta.env.VITE_API_KEY
+}
+
 // Wake the backend — call health endpoint silently on startup
 export const wakeBackend = () =>
   api.get('/health').catch(() => {})

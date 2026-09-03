@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from models.schemas import Requirement, RequirementBatch, VerificationResult
 from services.graph_builder import graph_builder
+from security import require_api_key
 
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
@@ -26,13 +27,13 @@ def list_requirements():
     return list(_store.values())
 
 
-@router.post("", response_model=Requirement)
+@router.post("", response_model=Requirement, dependencies=[Depends(require_api_key)])
 def add_requirement(req: Requirement):
     _store[req.id] = req
     return req
 
 
-@router.post("/batch", response_model=list[Requirement])
+@router.post("/batch", response_model=list[Requirement], dependencies=[Depends(require_api_key)])
 def add_batch(batch: RequirementBatch):
     for req in batch.requirements:
         _store[req.id] = req

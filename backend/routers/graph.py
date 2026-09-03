@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from models.schemas import RequirementBatch, KnowledgeGraph, TraceabilityLink
 from services.graph_builder import graph_builder
-from services.neo4j_service import persist_graph, neo4j_status
+from services.neo4j_service import persist_graph, neo4j_status, load_graph
+from security import require_api_key, rate_limit_llm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,26 +11,53 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 
 # In-memory state (NetworkX) — fast traversal for GraphRAG retrieval
 # Neo4j AuraDB stores the same graph for durable Cypher queries across restarts
-# TODO: on service restart, reload graph from Neo4j instead of requiring a rebuild
 #
-# KNOWN LIMITATION (issue #6, deliberately out of scope for this pass):
-# This state is a module-level global, which means: (1) it's lost whenever
-# the process restarts (Render free tier sleeps/restarts often), (2) it is
-# NOT safe if uvicorn is ever run with --workers > 1 (each worker gets its
-# own copy, so requests would see inconsistent state), and (3) every caller
-# shares one global graph — one user's POST /graph/build silently replaces
-# another's. query.py also reaches into this module's private global
+# KNOWN LIMITATION (issue #6, partially addressed):
+# This state is still a module-level global, which means: (1) it is NOT safe
+# if uvicorn is ever run with --workers > 1 (each worker gets its own copy,
+# so requests would see inconsistent state), and (2) every caller shares one
+# global graph — one user's POST /graph/build silently replaces another's.
+# query.py also reaches into this module's private global
 # (graph_router._current_graph), which is a brittle cross-module coupling.
-# Fixing this properly means: reloading from Neo4j on startup, moving state
-# into a GraphStore service injected via FastAPI Depends, and eventually
-# per-session/per-graph IDs so multiple graphs can coexist. That's a real
-# architectural change (state model + dependency wiring + Neo4j reload path)
-# and is deliberately not attempted in this pass — see issue #6.
+# What *is* now fixed: on startup (see main.py's `_startup`), if Neo4j is
+# configured and has previously-persisted data, `reload_from_neo4j()`
+# below repopulates `_current_graph` so a Render free-tier restart no longer
+# forces every user back to "no graph built yet" — the original TODO here.
+# The remaining work (GraphStore service + dependency injection, eventually
+# per-session/per-graph IDs) is a real architectural change and is
+# deliberately not attempted in this pass — see issue #6.
 _current_graph: KnowledgeGraph | None = None
 _current_requirements = []
 
 
-@router.post("/build", response_model=KnowledgeGraph)
+def reload_from_neo4j() -> bool:
+    """Called once at startup. If no graph is in memory yet and Neo4j has a
+    previously-persisted graph, load it so a service restart doesn't force
+    a rebuild. No-op (returns False) if a graph is already in memory, Neo4j
+    isn't configured, or there's nothing persisted yet."""
+    global _current_graph
+    if _current_graph is not None:
+        return False
+    data = load_graph()
+    if data is None:
+        return False
+    try:
+        _current_graph = KnowledgeGraph(**data)
+        logger.info(
+            "Reloaded graph from Neo4j on startup (%d nodes, %d edges)",
+            len(data["nodes"]), len(data["edges"]),
+        )
+        return True
+    except Exception as e:
+        logger.error("Failed to parse graph reloaded from Neo4j: %s", e)
+        return False
+
+
+@router.post(
+    "/build",
+    response_model=KnowledgeGraph,
+    dependencies=[Depends(require_api_key), Depends(rate_limit_llm)],
+)
 def build_graph(batch: RequirementBatch):
     global _current_graph, _current_requirements
     _current_requirements = batch.requirements

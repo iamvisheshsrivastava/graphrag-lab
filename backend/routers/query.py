@@ -1,14 +1,19 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from models.schemas import QueryRequest, QueryResult
 from services.rag_engine import rag_engine
 from services.neo4j_service import run_cypher
+from security import require_api_key, rate_limit_llm
 import routers.graph as graph_router
 
 router = APIRouter(prefix="/query", tags=["query"])
 
 
-@router.post("", response_model=QueryResult)
+@router.post(
+    "",
+    response_model=QueryResult,
+    dependencies=[Depends(require_api_key), Depends(rate_limit_llm)],
+)
 async def graphrag_query(request: QueryRequest):
     if graph_router._current_graph is None:
         raise HTTPException(400, detail="Build a knowledge graph first via POST /graph/build")

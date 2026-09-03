@@ -48,17 +48,14 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
-# KNOWN LIMITATION (issue #2, deliberately out of scope for this pass):
-# No authentication or rate limiting on any endpoint. Two concrete abuse
-# paths: (1) POST /query/ and /graph/build call the paid OpenRouter API, so
-# an unauthenticated bot hammering this public URL directly drains the
-# OPENROUTER_API_KEY budget; (2) POST /requirements/ and /requirements/batch
-# let anyone write into the shared in-memory store, polluting state for all
-# users. Payload sizes are now bounded (issue #11), which limits per-request
-# blast radius, but does not stop repeated/automated abuse. A real fix needs
-# a design decision (API-key header via FastAPI Depends on mutating/LLM
-# endpoints, e.g. slowapi-based per-IP rate limiting) that's out of scope
-# for this pass — flagging here rather than guessing at auth requirements.
+# issue #2: optional shared-API-key auth + per-IP rate limiting on the
+# cost-sensitive endpoints. See backend/security.py for the implementation.
+# API_KEY unset -> fully open (today's public-demo behavior, unchanged).
+# API_KEY set -> POST /graph/build, POST /query, and the /requirements
+# write endpoints require a matching X-API-Key header; /graph/build and
+# POST /query (the two OpenRouter-calling endpoints) are additionally
+# rate-limited per IP. Cheap read endpoints (/health, /graph/current, etc.)
+# stay ungated.
 app.include_router(requirements.router)
 app.include_router(graph.router)
 app.include_router(query.router)
@@ -69,6 +66,10 @@ def _startup():
     # Idempotent — creates per-label id-uniqueness constraints in Neo4j if
     # not already present. No-op if Neo4j isn't configured. See issue #10.
     ensure_constraints()
+    # Repopulate in-memory graph from Neo4j after a restart, if available.
+    # No-op if Neo4j isn't configured or nothing has been persisted yet.
+    # See issue #6.
+    graph.reload_from_neo4j()
 
 
 @app.get("/")
