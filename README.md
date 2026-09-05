@@ -1,5 +1,7 @@
 # GraphRAG — Automotive Requirements Knowledge Graph
 
+[![Backend tests](https://github.com/iamvisheshsrivastava/graphrag-lab/actions/workflows/test.yml/badge.svg)](https://github.com/iamvisheshsrivastava/graphrag-lab/actions/workflows/test.yml)
+
 A research tool for building **LLM-powered, domain-specific knowledge graphs** from automotive requirements text and querying them using **Graph-Retrieval-Augmented-Generation (GraphRAG)**.
 
 Targets ADAS and parking function requirements (SAE Level 2) with full traceability, consistency verification, natural language querying, and persistent graph storage via Neo4j AuraDB.
@@ -30,7 +32,7 @@ graphrag-lab/
 │   ├── models/schemas.py             # Pydantic data models
 │   ├── services/
 │   │   ├── ontology.py               # Automotive parking ontology (concepts, relations, rules)
-│   │   ├── llm_extractor.py          # LLM-based entity + relation extraction (gemini-2.5-flash)
+│   │   ├── llm_extractor.py          # LLM-based entity + relation extraction (GLM-4.6 via OpenRouter)
 │   │   ├── graph_builder.py          # KG construction: LLM extraction → ontology backbone
 │   │   ├── neo4j_service.py          # Neo4j AuraDB persistence + Cypher query runner
 │   │   └── rag_engine.py             # GraphRAG = BFS traversal + LLM generation
@@ -65,7 +67,7 @@ graphrag-lab/
 Graph building is a two-step pipeline:
 
 **Step 1 — LLM extraction** (`llm_extractor.py`)
-- Sends the full requirements batch to `google/gemini-2.5-flash` via OpenRouter in a single structured prompt
+- Sends the full requirements batch to `z-ai/glm-4.6` via OpenRouter in a single structured prompt (this repo has churned through three OpenRouter models so far as ones got retired or rate-limited — see Model Choice below)
 - Returns strict JSON: `{"entities": [...], "relations": [...]}`
 - Temperature = 0.0 for near-deterministic output
 - Entity types: `sensor | function | concept | actor | safety_level | standard | system`
@@ -97,7 +99,7 @@ Graph building is a two-step pipeline:
 - BFS context expansion (depth 2) around seed nodes
 - Graph context serialized into the LLM prompt alongside the question
 - Answer is grounded in cited graph nodes — every response includes the traversal path
-- Model: `google/gemini-2.5-flash` via OpenRouter
+- Model: `z-ai/glm-4.6` via OpenRouter (configurable via `OPENROUTER_MODEL`)
 
 ### 5. Requirements Input
 
@@ -164,8 +166,8 @@ Create `backend/.env`:
 # Required for LLM-based graph extraction and GraphRAG queries
 OPENROUTER_API_KEY=sk-or-v1-...
 
-# Optional: override the model (default: google/gemini-2.5-flash)
-OPENROUTER_MODEL=google/gemini-2.5-flash
+# Optional: override the model (default: z-ai/glm-4.6)
+OPENROUTER_MODEL=z-ai/glm-4.6
 
 # Required for Neo4j AuraDB persistence and Cypher Console
 NEO4J_URI=neo4j+s://xxxxxxxx.databases.neo4j.io
@@ -174,22 +176,32 @@ NEO4J_PASSWORD=your-password
 
 # Or use OpenAI directly (model switches to gpt-4o automatically)
 OPENAI_API_KEY=sk-...
+
+# Optional — leave unset for an open demo. If set, /graph/build, /query, and
+# the /requirements write endpoints require a matching X-API-Key header.
+API_KEY=
+RATE_LIMIT_WINDOW_SECONDS=60
+RATE_LIMIT_MAX_REQUESTS=10
 ```
 
 The root endpoint (`GET /`) reports `"llm_enabled": true / false` and `"llm_provider": "openrouter" | "openai" | "none"`.
 
 Without any API key, the system falls back to keyword-based graph extraction and template-based query answers — fully functional for offline/demo use.
 
+The deployed demo runs with `API_KEY` unset (open, matching the original public-demo behavior); the per-IP rate limit on `/graph/build` and `/query` (10 requests/60s by default) is what actually keeps OpenRouter costs bounded when the link gets shared.
+
 ---
 
 ## Model Choice
 
-| Model | Provider | Cost | Used for |
+| Model | Provider | Cost (in/out per 1M tokens) | Used for |
 |---|---|---|---|
-| `google/gemini-2.5-flash` | OpenRouter | ~$0.15/1M tokens | Graph extraction + GraphRAG queries |
-| `gpt-4o` | OpenAI | ~$2.50/1M tokens | Auto-selected if only `OPENAI_API_KEY` is set |
+| `z-ai/glm-4.6` | OpenRouter | $0.55 / $2.20 | Graph extraction + GraphRAG queries (current default) |
+| `gpt-4o` | OpenAI | $2.50 / $10.00 | Auto-selected if only `OPENAI_API_KEY` is set |
 
-At typical demo usage (10 graph builds + 50 queries), total cost ≈ **$0.01–0.02**.
+At typical demo usage (10 graph builds + 50 queries), total cost is well under a dollar.
+
+GLM-4.6 wasn't the first choice — this project has gone through `gemini-2.0-flash-001` and `gemini-2.5-flash` as OpenRouter retired or rate-limited the free/cheap Gemini tiers out from under it. It's also a reasoning model, which turned out to matter operationally: GLM-4.6 spends part of its `max_tokens` budget on hidden chain-of-thought before it ever writes the JSON the app expects, so a budget sized for a non-reasoning model (800 tokens) was silently starving the actual answer and causing intermittent 500s on `/query`. Bumped to 3000 — see `rag_engine.py`.
 
 ---
 
@@ -213,7 +225,9 @@ At typical demo usage (10 graph builds + 50 queries), total cost ≈ **$0.01–0
 - [x] Neo4j AuraDB integration for persistent Cypher-queryable graph storage
 - [x] Cypher Console in UI
 - [x] File upload for custom requirements (JSON / CSV)
-- [ ] Reload graph from Neo4j on service restart (currently requires manual rebuild)
+- [x] Reload graph from Neo4j on service restart
+- [x] Optional API-key auth + per-IP rate limiting on the OpenRouter-backed endpoints
+- [ ] Move in-memory graph/requirements state out of module-level globals into a proper `GraphStore` (needed for multi-worker deployment — see [issue #6](https://github.com/iamvisheshsrivastava/graphrag-lab/issues/6))
 - [ ] SHACL / SPARQL constraint validation layer
 - [ ] Export to ReqIF format for integration with DOORS / Polarion
 - [ ] Multi-document ingestion (PDF, DOCX, Excel requirement sheets)

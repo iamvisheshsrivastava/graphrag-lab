@@ -1,8 +1,8 @@
 """
 LLM-based entity and relation extractor for knowledge graph construction.
 
-Uses google/gemini-2.5-flash via OpenRouter — cheap (~$0.15/1M tokens)
-and reliable for structured JSON output.
+Uses z-ai/glm-4.6 via OpenRouter by default (override with OPENROUTER_MODEL) —
+cheap relative to GPT-4o and reliable for structured JSON output.
 
 For each batch of requirements it returns:
   {
@@ -23,9 +23,10 @@ from typing import Any, List, Dict
 
 logger = logging.getLogger(__name__)
 
-# gemini-2.5-flash: best cost/quality tradeoff for structured JSON extraction
-# ~$0.15/1M input tokens; deterministic at temperature=0.0
-# Alternatives: gemma-3-27b-it:free (unreliable JSON), gpt-4o-mini (slightly pricier)
+# glm-4.6: good cost/quality tradeoff for structured JSON extraction,
+# $0.55/$2.20 per 1M input/output tokens on OpenRouter; deterministic at
+# temperature=0.0. Earlier revisions of this project used Gemini 2.5 Flash
+# and Gemini 2.0 Flash, both retired/rate-limited on OpenRouter along the way.
 EXTRACTION_MODEL = os.getenv("OPENROUTER_MODEL", "z-ai/glm-4.6")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 

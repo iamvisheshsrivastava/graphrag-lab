@@ -1,8 +1,9 @@
 """
 GraphRAG Engine — combines graph traversal context with LLM generation.
 
-When OPENAI_API_KEY is set, uses GPT-4o for answer generation.
-Without a key, falls back to a deterministic template-based response.
+Uses OpenRouter (default model: z-ai/glm-4.6, see OPENROUTER_MODEL) when
+OPENROUTER_API_KEY is set; falls back to GPT-4o if only OPENAI_API_KEY is
+set. Without either, falls back to a deterministic template-based response.
 """
 
 import logging
