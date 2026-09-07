@@ -22,6 +22,24 @@ Built as a portfolio project supporting a PhD application in AI-based GraphRAG f
 
 ---
 
+## Screenshots
+
+Captured live from the deployed app against the automotive-requirements sample dataset (7 functional + 7 safety + 2 performance + non-functional requirements).
+
+**Requirements Manager (landing page)** — load the sample dataset, upload your own, or build the knowledge graph:
+
+![Requirements Manager](docs/screenshots/landing.png)
+
+**Knowledge Graph Viewer** — the Cytoscape.js graph built from the sample dataset (21 nodes, 4 edges, verified DAG), color-coded by node type (requirement, sensor, function, concept, safety level, actor):
+
+![Knowledge Graph Viewer](docs/screenshots/knowledge_graph.png)
+
+**GraphRAG Query result** — natural-language query *"What are the safety requirements for ASIL-B compliance?"* answered with a 100% confidence score, per-requirement citations (`APA-003`, `HMI-002`, `SYS-002`), a flagged traceability ambiguity, the graph traversal path, and the relevant nodes list:
+
+![GraphRAG Query result](docs/screenshots/query_result.png)
+
+---
+
 ## Architecture
 
 ```
