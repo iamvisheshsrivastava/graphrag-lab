@@ -73,6 +73,17 @@ def test_extract_graph_falls_back_when_no_client(monkeypatch):
     assert result == {"entities": [], "relations": []}
 
 
+def test_extract_graph_falls_back_on_null_content(monkeypatch, caplog):
+    # Reasoning models (e.g. GLM-4.6) can exhaust max_tokens on hidden
+    # reasoning and return message.content = None (issue #13) - this must
+    # not raise (None.strip() would AttributeError) and should fall back
+    # to keyword extraction like any other unavailable-LLM case.
+    monkeypatch.setattr(extractor, "_get_client", _fake_get_client(None))
+
+    result = extractor.extract_graph_from_requirements([{"id": "REQ-001", "text": "x"}])
+    assert result == {"entities": [], "relations": []}
+
+
 def test_extract_graph_falls_back_on_client_exception(monkeypatch):
     class _BoomClient:
         class chat:

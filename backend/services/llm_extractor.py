@@ -105,9 +105,26 @@ def extract_graph_from_requirements(requirements: List[Dict]) -> Dict[str, Any]:
                 {"role": "user",   "content": user_content},
             ],
             temperature=0.0,      # Deterministic
-            max_tokens=4096,
+            # GLM-4.6 (and other reasoning models) spend part of max_tokens on
+            # hidden reasoning before emitting visible content - for a full
+            # requirements batch producing "2-5 entities per requirement" of
+            # JSON, 4096 was tight enough to sometimes leave message.content
+            # as None entirely (see issue #13; same root cause as the
+            # rag_engine.py query fix in 4e24fa2).
+            max_tokens=8192,
         )
-        raw = response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        if not content:
+            # Model exhausted its token budget on hidden reasoning before
+            # producing any visible output. Log this distinctly from a JSON
+            # parse failure so it isn't mistaken for a malformed response.
+            logger.warning(
+                "LLM extraction returned empty/null content (likely reasoning "
+                "budget exhausted before visible output) - falling back to "
+                "keyword extraction"
+            )
+            return {"entities": [], "relations": []}
+        raw = content.strip()
 
         # Strip markdown fences if model adds them anyway
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
