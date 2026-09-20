@@ -4,7 +4,7 @@ from models.schemas import QueryRequest, QueryResult
 from services.rag_engine import rag_engine
 from services.neo4j_service import run_cypher
 from security import require_api_key, rate_limit_llm
-import routers.graph as graph_router
+from services.state import store
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -15,9 +15,10 @@ router = APIRouter(prefix="/query", tags=["query"])
     dependencies=[Depends(require_api_key), Depends(rate_limit_llm)],
 )
 async def graphrag_query(request: QueryRequest):
-    if graph_router._current_graph is None:
+    graph = store.graph
+    if graph is None:
         raise HTTPException(400, detail="Build a knowledge graph first via POST /graph/build")
-    return await rag_engine.query(request, graph_router._current_graph)
+    return await rag_engine.query(request, graph)
 
 
 class CypherRequest(BaseModel):

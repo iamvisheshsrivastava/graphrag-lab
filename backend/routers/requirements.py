@@ -7,10 +7,9 @@ from security import require_api_key
 
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
-# Same module-level-global limitation as backend/routers/graph.py — lost on
-# restart, unsafe with multiple workers, shared across all callers. See the
-# detailed note there and issue #6; deliberately out of scope for this pass.
-_store: dict[str, Requirement] = {}
+from services.state import store as _gs
+
+_store = _gs.requirements  # shared dict; graph builds populate it too
 
 DATA_PATH = Path(__file__).parent.parent / "data" / "sample_requirements.json"
 
