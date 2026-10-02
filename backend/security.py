@@ -46,6 +46,25 @@ RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "10"))
 # client_ip -> (window_start_epoch, count)
 _buckets: dict[str, tuple[float, int]] = defaultdict(lambda: (0.0, 0))
 
+# Periodic sweep so _buckets doesn't grow unboundedly over the life of the
+# process (issue #18) — every client IP that has ever hit a rate-limited
+# endpoint used to stay in the dict forever.
+_CLEANUP_INTERVAL_SECONDS = 300
+_last_cleanup: float = 0.0
+
+
+def _evict_stale_buckets(now: float) -> None:
+    """Drop buckets whose window has expired. Runs at most once per
+    _CLEANUP_INTERVAL_SECONDS so normal requests don't pay an O(n) scan."""
+    global _last_cleanup
+    if now - _last_cleanup < _CLEANUP_INTERVAL_SECONDS:
+        return
+    _last_cleanup = now
+    stale_cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+    stale_ips = [ip for ip, (window_start, _) in _buckets.items() if window_start < stale_cutoff]
+    for ip in stale_ips:
+        del _buckets[ip]
+
 
 def _client_ip(request: Request) -> str:
     # Render sits behind a proxy; prefer the first hop of X-Forwarded-For
@@ -62,6 +81,7 @@ def rate_limit_llm(request: Request) -> None:
     /graph/current, etc.) — only to the actual cost-abuse vector."""
     ip = _client_ip(request)
     now = time.time()
+    _evict_stale_buckets(now)
     window_start, count = _buckets[ip]
 
     if now - window_start >= RATE_LIMIT_WINDOW_SECONDS:

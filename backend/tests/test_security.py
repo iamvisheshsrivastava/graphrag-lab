@@ -104,3 +104,40 @@ def test_rate_limit_tracks_ips_independently(monkeypatch):
 def test_client_ip_prefers_x_forwarded_for():
     req = _FakeRequest("10.0.0.1", forwarded_for="203.0.113.5, 10.0.0.1")
     assert security._client_ip(req) == "203.0.113.5"
+
+
+def test_stale_buckets_are_evicted_after_cleanup_interval(monkeypatch):
+    """Issue #18: _buckets must not grow unboundedly — stale entries whose
+    window has long expired should be swept out once the cleanup interval
+    has elapsed."""
+    monkeypatch.setattr(security, "_buckets", _fresh_buckets())
+    monkeypatch.setattr(security, "_last_cleanup", 0.0)
+    monkeypatch.setattr(security, "RATE_LIMIT_WINDOW_SECONDS", 60)
+    monkeypatch.setattr(security, "_CLEANUP_INTERVAL_SECONDS", 300)
+
+    old_ip = "1.2.3.4"
+    security._buckets[old_ip] = (0.0, 1)  # long-expired window
+
+    # Cleanup interval hasn't elapsed since _last_cleanup (0.0) yet -> no sweep.
+    security._evict_stale_buckets(10.0)
+    assert old_ip in security._buckets
+
+    # Interval has now elapsed, and the bucket's window is well past
+    # RATE_LIMIT_WINDOW_SECONDS -> it gets swept.
+    security._evict_stale_buckets(301.0)
+    assert old_ip not in security._buckets
+
+
+def test_fresh_buckets_survive_cleanup(monkeypatch):
+    monkeypatch.setattr(security, "_buckets", _fresh_buckets())
+    monkeypatch.setattr(security, "_last_cleanup", 0.0)
+    monkeypatch.setattr(security, "RATE_LIMIT_WINDOW_SECONDS", 60)
+    monkeypatch.setattr(security, "_CLEANUP_INTERVAL_SECONDS", 300)
+
+    fresh_ip = "9.1.1.1"
+    security._buckets[fresh_ip] = (300.0, 1)  # window just started
+
+    # Cleanup interval has elapsed, but this bucket's window is still
+    # within RATE_LIMIT_WINDOW_SECONDS of "now" -> it survives.
+    security._evict_stale_buckets(301.0)
+    assert fresh_ip in security._buckets
