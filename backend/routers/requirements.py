@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
-from models.schemas import Requirement, RequirementBatch, VerificationResult
+from models.schemas import Requirement, RequirementBatch, VerificationResult, ConflictResult
 from services.graph_builder import graph_builder
 from security import require_api_key
 
@@ -37,6 +37,21 @@ def add_batch(batch: RequirementBatch):
     for req in batch.requirements:
         _store[req.id] = req
     return batch.requirements
+
+
+@router.get("/conflicts", response_model=list[ConflictResult])
+def get_conflicts():
+    """Deterministic conflict-detection pass over the current graph (issue
+    #15): explicit conflicts_with edges, numeric threshold mismatches, and
+    ASIL mismatches along depends_on/derives_from chains. Same no-LLM,
+    read-path pattern as /requirements/verify-all.
+
+    Registered before /{req_id} so the literal "conflicts" path segment
+    isn't swallowed by that dynamic route.
+    """
+    if _gs.graph is None:
+        raise HTTPException(400, detail="Build a knowledge graph first via POST /graph/build")
+    return graph_builder.detect_conflicts(_store)
 
 
 @router.get("/{req_id}", response_model=Requirement)

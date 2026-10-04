@@ -13,11 +13,11 @@ Falls back to keyword-based extraction if LLM is unavailable.
 
 import re
 import networkx as nx
-from typing import List, Tuple, Dict
+from typing import List, Optional, Tuple, Dict
 
 from models.schemas import (
     Requirement, KnowledgeGraph, GraphNode, GraphEdge,
-    TraceabilityLink, VerificationResult,
+    TraceabilityLink, VerificationResult, ConflictResult,
 )
 from services.ontology import PARKING_ONTOLOGY
 from services.llm_extractor import extract_graph_from_requirements
@@ -53,6 +53,14 @@ DEPENDENCY_KEYWORDS = {
     "derives_from":   ["derived from", "allocated to", "traces to"],
     "implements":     ["implements", "realizes", "satisfies"],
 }
+
+# ─── Conflict detection (issue #15) ───────────────────────────────────────────
+
+_ASIL_ORDER = {"ASIL_A": 1, "ASIL_B": 2, "ASIL_C": 3, "ASIL_D": 4}
+_ASIL_PATTERN = re.compile(r"ASIL[-_ ]?([ABCD])\b", re.IGNORECASE)
+_NUMERIC_UNIT_PATTERN = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(ms|s|sec|secs|seconds|m|km/h|mph|%)\b", re.IGNORECASE
+)
 
 
 class GraphBuilder:
@@ -317,6 +325,112 @@ class GraphBuilder:
             issues=issues,
             suggestions=suggestions,
         )
+
+    # ─── Conflict detection ───────────────────────────────────────────────────
+
+    def _extract_asil(self, text: str) -> Optional[str]:
+        m = _ASIL_PATTERN.search(text)
+        return f"ASIL_{m.group(1).upper()}" if m else None
+
+    def _extract_numeric_thresholds(self, text: str) -> List[Tuple[float, str]]:
+        return [(float(v), unit.lower()) for v, unit in _NUMERIC_UNIT_PATTERN.findall(text)]
+
+    def detect_conflicts(self, requirements: Dict[str, Requirement]) -> List[ConflictResult]:
+        """Deterministic, no-LLM conflict-detection pass (issue #15).
+
+        Three checks, all additive to the read path (no new persistent
+        state, same pattern as verify_requirement):
+          1. Explicit `conflicts_with` edges already extracted into the
+             graph (by the LLM extractor or the keyword fallback) but never
+             surfaced anywhere until now (issue #8).
+          2. Quantitative mismatches: two requirements connected by a
+             depends_on/derives_from edge that state different numeric
+             thresholds for the same unit (e.g. "10s" vs "15s").
+          3. ASIL mismatches: a requirement that depends_on/derives_from
+             another requirement stating a *lower* ASIL level — ISO 26262
+             decomposition requires what a requirement depends on to be at
+             least as safety-rated as the dependent itself.
+
+        `requirements` maps requirement id -> Requirement (e.g. the shared
+        GraphStore.requirements dict) so the deterministic text checks have
+        the full requirement text to work with, not just the graph's
+        truncated node properties.
+        """
+        conflicts: List[ConflictResult] = []
+        seen_explicit: set = set()
+        seen_numeric: set = set()
+        seen_asil: set = set()
+
+        def pair_key(a: str, b: str):
+            return tuple(sorted((a, b)))
+
+        for src, tgt, data in self.graph.edges(data=True):
+            relation = data.get("relation")
+
+            if relation == "conflicts_with":
+                key = pair_key(src, tgt)
+                if key not in seen_explicit:
+                    seen_explicit.add(key)
+                    conflicts.append(ConflictResult(
+                        requirement_a=src,
+                        requirement_b=tgt,
+                        conflict_type="explicit_conflicts_with",
+                        description=(
+                            f"{src} and {tgt} are explicitly linked by a "
+                            "conflicts_with edge extracted from the requirements text."
+                        ),
+                    ))
+                continue
+
+            if relation not in ("depends_on", "derives_from"):
+                continue
+
+            req_src = requirements.get(src)
+            req_tgt = requirements.get(tgt)
+            if req_src is None or req_tgt is None:
+                continue  # one endpoint is an entity/concept, not a requirement
+
+            key = pair_key(src, tgt)
+
+            if key not in seen_numeric:
+                src_vals = self._extract_numeric_thresholds(req_src.text)
+                tgt_vals = self._extract_numeric_thresholds(req_tgt.text)
+                for sval, sunit in src_vals:
+                    if key in seen_numeric:
+                        break
+                    for tval, tunit in tgt_vals:
+                        if sunit == tunit and sval != tval:
+                            seen_numeric.add(key)
+                            conflicts.append(ConflictResult(
+                                requirement_a=src,
+                                requirement_b=tgt,
+                                conflict_type="numeric_mismatch",
+                                description=(
+                                    f"{src} states {sval}{sunit} while its "
+                                    f"dependency {tgt} states {tval}{tunit} for "
+                                    "the same quantity — thresholds disagree."
+                                ),
+                            ))
+                            break
+
+            if key not in seen_asil:
+                src_asil = self._extract_asil(req_src.text)
+                tgt_asil = self._extract_asil(req_tgt.text)
+                if src_asil and tgt_asil and _ASIL_ORDER[tgt_asil] < _ASIL_ORDER[src_asil]:
+                    seen_asil.add(key)
+                    conflicts.append(ConflictResult(
+                        requirement_a=src,
+                        requirement_b=tgt,
+                        conflict_type="asil_mismatch",
+                        description=(
+                            f"{src} ({src_asil}) depends on {tgt} ({tgt_asil}), "
+                            "but ISO 26262 decomposition requires a dependency "
+                            "to be at least as safety-rated as the requirement "
+                            "that relies on it."
+                        ),
+                    ))
+
+        return conflicts
 
     def graph_rag_retrieve(self, query: str, top_k: int = 5):
         query_lower = query.lower()

@@ -81,3 +81,11 @@ class VerificationResult(BaseModel):
     status: str  # verified, conflict, incomplete, ambiguous
     issues: List[str]
     suggestions: List[str]
+
+
+class ConflictResult(BaseModel):
+    """One detected conflict between two requirements (issue #15)."""
+    requirement_a: str
+    requirement_b: str
+    conflict_type: str  # explicit_conflicts_with, numeric_mismatch, asil_mismatch
+    description: str

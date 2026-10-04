@@ -26,7 +26,10 @@ class CypherRequest(BaseModel):
     params: dict = {}
 
 
-@router.post("/cypher")
+@router.post(
+    "/cypher",
+    dependencies=[Depends(require_api_key), Depends(rate_limit_llm)],
+)
 def cypher_query(req: CypherRequest):
     """
     Execute a Cypher query against Neo4j AuraDB.

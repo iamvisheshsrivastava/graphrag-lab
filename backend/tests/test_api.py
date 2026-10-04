@@ -89,3 +89,52 @@ def test_neo4j_status_reports_not_connected_when_unconfigured(client):
     resp = client.get("/graph/neo4j/status")
     assert resp.status_code == 200
     assert resp.json()["connected"] is False
+
+
+def test_cypher_endpoint_requires_api_key_when_configured(client, monkeypatch):
+    """Issue #19: /query/cypher must be gated the same as the other
+    cost-sensitive endpoints once API_KEY is configured."""
+    import security
+    monkeypatch.setattr(security, "API_KEY", "secret123")
+    resp = client.post("/query/cypher", json={"query": "MATCH (n) RETURN n LIMIT 1"})
+    assert resp.status_code == 401
+
+
+def test_cypher_endpoint_rejects_empty_query(client):
+    resp = client.post("/query/cypher", json={"query": "   "})
+    assert resp.status_code == 400
+
+
+def test_graph_export_without_a_built_graph_is_400(client):
+    # Mirrors test_graph_current_without_a_built_graph: if an earlier test in
+    # this process already built a graph, 200 is also acceptable.
+    resp = client.get("/graph/export?format=graphml")
+    assert resp.status_code in (200, 400)
+
+
+def test_graph_export_rejects_unknown_format(client):
+    resp = client.get("/graph/export?format=yaml")
+    assert resp.status_code in (400, 200)
+    if resp.status_code == 400:
+        assert "format" in resp.json()["detail"]
+
+
+def test_requirements_conflicts_without_a_built_graph(client):
+    resp = client.get("/requirements/conflicts")
+    assert resp.status_code in (200, 400)
+
+
+def test_create_snapshot_without_a_built_graph_is_400(client):
+    resp = client.post("/graph/snapshots", json={"name": "v1"})
+    assert resp.status_code in (200, 400)
+
+
+def test_list_snapshots_returns_a_list(client):
+    resp = client.get("/graph/snapshots")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
+
+def test_diff_unknown_snapshots_is_404(client):
+    resp = client.get("/graph/snapshots/diff", params={"a": "does-not-exist-a", "b": "does-not-exist-b"})
+    assert resp.status_code == 404

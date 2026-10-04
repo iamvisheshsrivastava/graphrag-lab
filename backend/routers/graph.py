@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from models.schemas import RequirementBatch, KnowledgeGraph, TraceabilityLink
 from services.graph_builder import graph_builder
 from services.neo4j_service import persist_graph, neo4j_status, load_graph
 from services.state import store
+from services import graph_export, graph_diff
 from security import require_api_key, rate_limit_llm
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -101,3 +104,81 @@ def get_graph_stats():
 def get_traceability(req_id: str):
     links = graph_builder.get_traceability(req_id)
     return links
+
+
+# ─── Export (issue #14) ───────────────────────────────────────────────────────
+
+_EXPORT_CONTENT = {
+    "graphml": ("application/xml", "graph.graphml"),
+    "cypher": ("text/plain", "graph.cypher"),
+    "jsonld": ("application/ld+json", "graph.jsonld"),
+}
+
+
+@router.get("/export")
+def export_graph(format: str = "graphml"):
+    """Serialize the current in-memory graph (store.graph — the single
+    shared in-process graph, see issue #6) to a portable interchange format:
+    GraphML (Gephi/yEd), a Cypher MERGE script, or JSON-LD."""
+    if format not in _EXPORT_CONTENT:
+        raise HTTPException(400, detail="format must be one of: graphml, cypher, jsonld")
+
+    graph = store.graph
+    if graph is None:
+        raise HTTPException(400, detail="Build a knowledge graph first via POST /graph/build")
+
+    if format == "graphml":
+        content = graph_export.to_graphml(graph)
+    elif format == "cypher":
+        content = graph_export.to_cypher(graph)
+    else:
+        content = json.dumps(graph_export.to_jsonld(graph), indent=2)
+
+    media_type, filename = _EXPORT_CONTENT[format]
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─── Named snapshots + diff (issue #16) ───────────────────────────────────────
+# In-memory only (services.state.GraphStore.snapshots) — same singleton/
+# per-process caveats as the rest of the shared graph state (issue #6).
+
+
+class SnapshotCreateRequest(BaseModel):
+    name: str
+
+
+@router.post("/snapshots", dependencies=[Depends(require_api_key)])
+def create_snapshot(req: SnapshotCreateRequest):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(400, detail="Snapshot name must not be empty")
+    try:
+        snap = store.save_snapshot(name)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    return {
+        "name": name,
+        "created_at": snap["created_at"],
+        "node_count": len(snap["graph"].nodes),
+        "edge_count": len(snap["graph"].edges),
+    }
+
+
+@router.get("/snapshots")
+def list_snapshots():
+    return store.list_snapshots()
+
+
+@router.get("/snapshots/diff")
+def diff_snapshots(a: str, b: str):
+    graph_a = store.get_snapshot(a)
+    graph_b = store.get_snapshot(b)
+    if graph_a is None:
+        raise HTTPException(404, detail=f"Snapshot '{a}' not found")
+    if graph_b is None:
+        raise HTTPException(404, detail=f"Snapshot '{b}' not found")
+    return graph_diff.diff_graphs(graph_a, graph_b)
