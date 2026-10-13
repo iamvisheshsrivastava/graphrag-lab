@@ -37,6 +37,16 @@ export default function App() {
     setPage('graph')
   }
 
+  // Restoring an already-built graph after a backend restart (issue #20/#21)
+  // shouldn't yank the user to the Graph page the way an explicit "Build
+  // Knowledge Graph" click does — just populate the state so GraphViewer,
+  // VerificationPanel, and TraceabilityPanel show real data instead of
+  // "Build a graph first" whenever the user navigates there.
+  function handleGraphRestored(g, reqs) {
+    setGraph(g)
+    setRequirements(reqs)
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar active={page} onNav={setPage} />
@@ -51,7 +61,7 @@ export default function App() {
         {/* Content */}
         <div className="flex-1 overflow-hidden p-5">
           {page === 'requirements' && (
-            <RequirementsPanel onGraphBuilt={handleGraphBuilt} />
+            <RequirementsPanel onGraphBuilt={handleGraphBuilt} onGraphRestored={handleGraphRestored} />
           )}
           {page === 'graph' && (
             <GraphViewer graph={graph} highlightNodes={highlightNodes} />

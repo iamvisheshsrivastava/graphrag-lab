@@ -29,6 +29,9 @@ export const buildGraph = (reqs) =>
 export const getCurrentGraph = () =>
   api.get('/graph/current').then(r => r.data)
 
+export const listRequirements = () =>
+  api.get('/requirements').then(r => r.data)
+
 export const getTraceability = (reqId) =>
   api.get(`/graph/traceability/${reqId}`).then(r => r.data)
 

@@ -30,6 +30,10 @@ def reload_from_neo4j() -> bool:
         return False
     try:
         store.graph = KnowledgeGraph(**data)
+        # Also rebuild the NetworkX graph that graph_builder.detect_conflicts()
+        # and graph_builder.get_traceability() read from. store.graph alone
+        # isn't enough — those methods never look at it (see issue #20).
+        graph_builder.load_from_knowledge_graph(store.graph)
         logger.info(
             "Reloaded graph from Neo4j on startup (%d nodes, %d edges)",
             len(data["nodes"]), len(data["edges"]),

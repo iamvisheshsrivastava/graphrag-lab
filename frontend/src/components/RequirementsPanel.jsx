@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Upload, Play, Trash2, Tag, Wifi, FileUp, AlertTriangle } from 'lucide-react'
-import { fetchSampleRequirements, addRequirements, buildGraph, wakeBackend } from '../lib/api'
+import { fetchSampleRequirements, addRequirements, buildGraph, wakeBackend, getCurrentGraph, listRequirements } from '../lib/api'
 import clsx from 'clsx'
 
 const TYPE_COLORS = {
@@ -35,7 +35,7 @@ function parseCSV(text) {
   }).filter(r => r.text)
 }
 
-export default function RequirementsPanel({ onGraphBuilt }) {
+export default function RequirementsPanel({ onGraphBuilt, onGraphRestored }) {
   const [reqs, setReqs] = useState([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
@@ -43,9 +43,23 @@ export default function RequirementsPanel({ onGraphBuilt }) {
   const [uploadError, setUploadError] = useState(null)
   const fileRef = useRef(null)
 
-  // Silently wake the backend as soon as the panel mounts
+  // Silently wake the backend as soon as the panel mounts, then check
+  // whether a graph already exists in Neo4j/memory from before a restart
+  // (issue #21) — if so, restore it instead of leaving GraphViewer showing
+  // "Build a graph first" until the user rebuilds from scratch.
   useEffect(() => {
-    wakeBackend().then(() => setBackendAwake(true))
+    wakeBackend().then(async () => {
+      setBackendAwake(true)
+      try {
+        const graph = await getCurrentGraph()
+        const restoredReqs = await listRequirements().catch(() => [])
+        setReqs(restoredReqs)
+        onGraphRestored?.(graph, restoredReqs)
+        setStatus(`Restored existing graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges`)
+      } catch {
+        // No graph built yet (404) — nothing to restore, normal first run.
+      }
+    })
   }, [])
 
   function handleFileUpload(e) {

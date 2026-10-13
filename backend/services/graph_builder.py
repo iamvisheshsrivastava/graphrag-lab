@@ -67,6 +67,22 @@ class GraphBuilder:
     def __init__(self):
         self.graph = nx.DiGraph()
 
+    # ─── Rebuild from a persisted KnowledgeGraph (issue #20) ─────────────────
+
+    def load_from_knowledge_graph(self, graph: KnowledgeGraph) -> None:
+        """Repopulate the in-process NetworkX graph from a KnowledgeGraph
+        (e.g. one reloaded from Neo4j on startup — see
+        routers/graph.py::reload_from_neo4j). Without this, self.graph stays
+        an empty DiGraph after a restart even though store.graph was
+        restored, so detect_conflicts()/get_traceability() (which read
+        self.graph, not store.graph) would see nothing until the next
+        /graph/build."""
+        self.graph.clear()
+        for node in graph.nodes:
+            self.graph.add_node(node.id, node_type=node.type, **node.properties)
+        for edge in graph.edges:
+            self.graph.add_edge(edge.source, edge.target, relation=edge.relation)
+
     # ─── LLM-based build ──────────────────────────────────────────────────────
 
     def build_from_requirements(self, requirements: List[Requirement]) -> KnowledgeGraph:

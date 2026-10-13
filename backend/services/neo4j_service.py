@@ -57,7 +57,16 @@ def _driver():
     pwd  = os.getenv("NEO4J_PASSWORD")
     if not uri or not pwd:
         return None
-    return GraphDatabase.driver(uri, auth=(user, pwd))
+    try:
+        return GraphDatabase.driver(uri, auth=(user, pwd))
+    except Exception as e:
+        # A malformed NEO4J_URI (bad scheme, typo, etc.) raises here, not at
+        # query time — GraphDatabase.driver() validates/parses the URI
+        # eagerly. Previously this was unguarded, so a bad env var crashed
+        # FastAPI at startup (ensure_constraints() -> _driver()) instead of
+        # just disabling Neo4j persistence (see issue #22).
+        logger.error("Failed to construct Neo4j driver (check NEO4J_URI): %s", e)
+        return None
 
 
 # ─── Write ────────────────────────────────────────────────────────────────────
