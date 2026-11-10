@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "cytoscape": "^3.30.2",
+    "cytoscape": "^3.34.4",
     "react-cytoscapejs": "^2.0.0",
     "axios": "^1.7.7",
     "lucide-react": "^0.441.0",
