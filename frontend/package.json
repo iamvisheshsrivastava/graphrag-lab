@@ -13,7 +13,7 @@
     "react-dom": "^18.3.1",
     "cytoscape": "^3.30.2",
     "react-cytoscapejs": "^2.0.0",
-    "axios": "^1.7.7",
+    "axios": "^1.21.0",
     "lucide-react": "^0.441.0",
     "clsx": "^2.1.1"
   },
