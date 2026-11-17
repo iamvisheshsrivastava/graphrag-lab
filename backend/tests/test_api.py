@@ -57,6 +57,24 @@ def test_get_unknown_requirement_is_404(client):
     assert resp.status_code == 404
 
 
+def test_delete_requirement_roundtrip(client):
+    payload = {"id": "REQ-DELETE-1", "text": "The system shall be deletable.", "type": "functional"}
+    resp = client.post("/requirements", json=payload)
+    assert resp.status_code == 200
+
+    resp = client.delete("/requirements/REQ-DELETE-1")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": "REQ-DELETE-1"}
+
+    resp = client.get("/requirements/REQ-DELETE-1")
+    assert resp.status_code == 404
+
+
+def test_delete_unknown_requirement_is_404(client):
+    resp = client.delete("/requirements/does-not-exist")
+    assert resp.status_code == 404
+
+
 def test_requirement_text_over_max_length_is_rejected(client):
     payload = {"id": "REQ-TOO-LONG", "text": "x" * 5001}
     resp = client.post("/requirements", json=payload)

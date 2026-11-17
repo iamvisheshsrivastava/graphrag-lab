@@ -61,6 +61,14 @@ def get_requirement(req_id: str):
     return _store[req_id]
 
 
+@router.delete("/{req_id}", dependencies=[Depends(require_api_key)])
+def delete_requirement(req_id: str):
+    if req_id not in _store:
+        raise HTTPException(404, detail=f"Requirement {req_id} not found")
+    del _store[req_id]
+    return {"deleted": req_id}
+
+
 @router.post("/verify/{req_id}", response_model=VerificationResult)
 def verify_requirement(req_id: str):
     if req_id not in _store:
