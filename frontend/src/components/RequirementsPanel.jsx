@@ -31,6 +31,7 @@ function parseCSV(text) {
       sae_level: obj.sae_level || obj.sae || 'L2',
       domain:    obj.domain    || 'parking',
       tags:      obj.tags ? obj.tags.split(';').map(t => t.trim()) : [],
+      source:    obj.source || undefined,
     }
   }).filter(r => r.text)
 }
